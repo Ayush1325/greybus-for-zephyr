@@ -1,21 +1,18 @@
-image: zephyrprojectrtos/zephyr-build:v0.24.7
-
-variables:
-  ZEPHYR_BASE: /builds/beagleconnect/zephyr/greybus-for-zephyr/zephyr
-  PROJECT: greybus
-  APP: samples/subsys/greybus/net
+image: zephyrprojectrtos/zephyr-build:v0.26.13
 
 build:
   stage: build
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
   before_script:
+    - rm -rf ../.west
     - west init -l .
     - west update
     - west zephyr-export
-    - pip3 install -r $ZEPHYR_BASE/scripts/requirements-base.txt
+    - pip3 install -r ../zephyr/scripts/requirements-base.txt
   script:
-    - west build -d buildx/freedom/$PROJECT -b beagleconnect_freedom $APP -- -DOVERLAY_CONFIG="overlay-802154-subg.conf"
-    - mkdir -p build/freedom/$PROJECT/zephyr
-    - cp buildx/freedom/$PROJECT/zephyr/zephyr.bin build/freedom/$PROJECT/zephyr/zephyr.bin
+    - source ../zephyr/zephyr-env.sh
+    - west build -b beagleconnect_freedom samples/subsys/greybus/net/ -p -- -DEXTRA_CONF_FILE=overlay-802154-subg.conf
   artifacts:
     paths:
-      - build
+      - build/zephyr/zephyr.bin
