@@ -152,7 +152,6 @@ struct gb_driver {
 
 	struct gb_operation_handler *op_handlers;
 
-	size_t stack_size;
 	size_t op_handlers_count;
 	const char *name;
 

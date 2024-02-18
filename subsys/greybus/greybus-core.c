@@ -55,8 +55,6 @@ extern int pthread_setname_np(pthread_t thread, const char *name);
 #include <zephyr/posix/pthread.h>
 #include <zephyr/posix/semaphore.h>
 
-#define DEFAULT_STACK_SIZE CONFIG_PTHREAD_DYNAMIC_STACK_DEFAULT_SIZE
-
 #endif
 
 #include <stdio.h>
@@ -553,8 +551,6 @@ int gb_unregister_driver(unsigned int cport)
 
 int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *driver)
 {
-	pthread_attr_t thread_attr;
-	pthread_attr_t *thread_attr_ptr = &thread_attr;
 	struct gb_bundle *bundle;
 	char thread_name[CONFIG_THREAD_MAX_NAME_LEN];
 	int retval;
@@ -629,23 +625,7 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 
 	g_cport[cport].exit_worker = false;
 
-	if (!driver->stack_size) {
-		driver->stack_size = DEFAULT_STACK_SIZE;
-	}
-
-	retval = pthread_attr_init(&thread_attr);
-	if (retval) {
-		LOG_ERR("pthread_attr_init() failed (%d)", retval);
-		goto pthread_attr_init_error;
-	}
-
-	retval = pthread_attr_setstacksize(&thread_attr, driver->stack_size);
-	if (retval) {
-		LOG_ERR("pthread_attr_setstacksize() failed (%d)", retval);
-		goto pthread_attr_setstacksize_error;
-	}
-
-	retval = pthread_create(&g_cport[cport].thread, &thread_attr, gb_pending_message_worker,
+	retval = pthread_create(&g_cport[cport].thread, NULL, gb_pending_message_worker,
 				(void *)((intptr_t)cport));
 	if (retval) {
 		LOG_ERR("pthread_create() failed (%d)", retval);
@@ -655,19 +635,11 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 	snprintf(thread_name, sizeof(thread_name), "greybus[%u]", cport);
 	pthread_setname_np(g_cport[cport].thread, thread_name);
 
-	pthread_attr_destroy(&thread_attr);
-	thread_attr_ptr = NULL;
-
 	g_cport[cport].driver = driver;
 
 	return 0;
 
 pthread_create_error:
-pthread_attr_setstacksize_error:
-	if (thread_attr_ptr != NULL) {
-		pthread_attr_destroy(&thread_attr);
-	}
-pthread_attr_init_error:
 	LOG_ERR("Can not create thread for %s", gb_driver_name(driver));
 	if (driver->exit) {
 		driver->exit(cport, bundle);
