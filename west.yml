@@ -1,13 +1,19 @@
+# Copyright (c) 2024 Ayush Singh <ayush@beagleboard.org>
+# SPDX-License-Identifier: Apache-2.0
+
 manifest:
   self:
-    path: greybus
+    west-commands: scripts/west-commands.yml
+
   remotes:
-    - name: zephyrproject-rtos
-      url-base: https://github.com/zephyrproject-rtos
-    - name: beagle-sdk
-      url-base: https://openbeagle.org/beagleconnect/zephyr
+    - name: ayush
+      url-base: https://openbeagle.org/ayush1325
+
   projects:
     - name: zephyr
-      remote: beagle-sdk
-      revision: demo
-      import: true
+      remote: ayush
+      revision: bct-2
+      import:
+        name-allowlist:
+          - hal_ti
+          - cmsis
