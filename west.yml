@@ -6,14 +6,14 @@ manifest:
     west-commands: scripts/west-commands.yml
 
   remotes:
-    - name: ayush
-      url-base: https://openbeagle.org/ayush1325
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
 
   projects:
     - name: zephyr
-      remote: ayush
-      revision: bct-2
+      remote: zephyrproject-rtos
+      revision: main
       import:
         name-allowlist:
           - hal_ti
-          - cmsis
+          - cmsis_6

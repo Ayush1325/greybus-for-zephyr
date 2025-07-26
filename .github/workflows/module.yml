@@ -6,27 +6,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: "zephyrprojectrtos/ci:latest"
     
-    env:
-      CMAKE_PREFIX_PATH: /opt/toolchains
-      
     steps:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        submodules: true
         path: greybus
+        submodules: true
 
-    - name: Initialize West Workspace
-      run: |
-        west init -l greybus
-        west update
+    - name: Setup Zephyr project
+      uses: zephyrproject-rtos/action-zephyr-setup@v1
+      with:
+        app-path: greybus
+        toolchains: arm-zephyr-eabi
 
     - name: Build for beagleconnect_freedom
       run: |
         export ZEPHYR_BASE=$(pwd)/zephyr
-        export CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH:$ZEPHYR_BASE/share/zephyr-package/cmake"
+        export CMAKE_PREFIX_PATH="$ZEPHYR_BASE/share/zephyr-package/cmake"
         
         west build -b beagleconnect_freedom -p always greybus/samples/subsys/greybus/net -- -DEXTRA_CONF_FILE=overlay-802154-subg.conf
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: greybus-beagleconnect-freedom-firmware
+        path: |
+          build/zephyr/zephyr.bin
