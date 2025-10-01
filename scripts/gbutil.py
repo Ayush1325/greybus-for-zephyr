@@ -32,29 +32,6 @@ def get_interface_descriptor(defines):
             break
     return iface
 
-def get_mikrobus_descriptor(defines):
-    mikrobus = None
-    for key in defines:
-        val = defines[key]
-        if key.endswith('_P_compatible_IDX_0') and val == '"zephyr,greybus-mikrobus"':
-            node = key[:-len('_P_compatible_IDX_0')]
-            pwm = int(defines[node + '_P_pwmstate'])
-            _int = int(defines[node + '_P_intstate'])
-            rx = int(defines[node + '_P_rxstate'])
-            tx = int(defines[node + '_P_txstate'])
-            scl = int(defines[node + '_P_sclstate'])
-            sda = int(defines[node + '_P_sdastate'])
-            mosi = int(defines[node + '_P_mosistate'])
-            miso = int(defines[node + '_P_misostate'])
-            sck = int(defines[node + '_P_sckstate'])
-            cs = int(defines[node + '_P_csstate'])
-            rst = int(defines[node + '_P_rststate'])
-            an = int(defines[node + '_P_anstate'])
-            mikrobus = MikrobusDescriptor(pwm, _int, rx, tx, scl, \
-                            sda, mosi, miso, sck, cs, rst, an, None)
-            break
-    return mikrobus
-
 def get_bundle_descriptors(defines):
     bd = {}
     for key in defines:
@@ -98,7 +75,6 @@ def dt2mnfs(fn):
                 val = val.strip()
                 defines[key] = val
     interface_desc = get_interface_descriptor(defines)
-    mikrobus_desc = get_mikrobus_descriptor(defines)
     string_descs = get_string_descriptors(defines, interface_desc)
     bundle_descs = get_bundle_descriptors(defines)
     cport_descs = get_cport_descriptors(defines)
@@ -109,7 +85,6 @@ def dt2mnfs(fn):
     for d in string_descs:
         m.add_string_desc(string_descs[d])
     m.add_interface_desc(interface_desc)
-    m.add_mikrobus_desc(mikrobus_desc)
     for d in bundle_descs:
         m.add_bundle_desc(bundle_descs[d])
     for d in cport_descs:
