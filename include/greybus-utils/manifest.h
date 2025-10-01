@@ -53,6 +53,7 @@ void release_manifest_blob(void *manifest);
 sys_dlist_t *get_manifest_cports(void);
 int get_manifest_size(void);
 size_t manifest_get_max_bundle_id(void);
+size_t manifest_get_num_cports(void);
 size_t manifest_get_num_cports_bundle(int bundle_id);
 unsigned int manifest_get_start_cport_bundle(int bundle_id);
 

@@ -25,36 +25,6 @@ config GREYBUS_MANIFEST_BUILTIN
 	  data.
 endchoice
 
-config GREYBUS_CLICK_MANIFEST_BUILTIN
-	bool "Use Compiled in Click Manifests"
-	depends on GREYBUS_MANIFEST_BUILTIN
-	help
-	  Choose click manifests generated during compile time
-
-config GREYBUS_CLICK_MANIFEST_CLICKID
-	bool "Use Click Manifests from Click ID Adapter"
-	depends on GREYBUS_MANIFEST_BUILTIN
-	help
-	  Choose click manifests read from Click ID Adapter board
-
-config GREYBUS_MIKROBUS_CLICK1_NAME
-	string "mikroBUS port 1 Click Name"
-	default ""
-	help
-	  This is the name of the Click Board which is connected
-	  to the mikroBUS port 1 on the board the click manifest
-	  should already be present in the manifesto manifests
-	  directory.
-
-config GREYBUS_MIKROBUS_CLICK2_NAME
-	string "mikroBUS port 2 Click Name"
-	default ""
-	help
-	  This is the name of the Click Board which is connected
-	  to the mikroBUS port 2 on the board the click manifest
-	  should already be present in the manifesto manifests
-	  directory.
-
 config GREYBUS_ENABLE_TLS
 	bool "Use Transport Layer Security (TLS)"
 	depends on TLS_CREDENTIALS
@@ -257,13 +227,6 @@ config GREYBUS_VIBRATOR
 	bool "Greybus Vibrator"
 	help
 	  Select this for Greybus Vibrator support.
-
-config GREYBUS_MIKROBUS_INIT_PRIORITY
-	int "default Greybus mikroBUS Init Priority"
-	default 80
-	range 0 99
-	help
-	  Greybus mikrobus init priority to ensure device initialization order.
 
 config GREYBUS_SERVICE_INIT_PRIORITY
 	int "default Greybus Service Init Priority"

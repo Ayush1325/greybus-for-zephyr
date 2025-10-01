@@ -85,36 +85,6 @@ static int greybus_service_init(const struct device *bus)
 	}
 	memcpy(combined_mnfb, mnfb, mnfb_size);
 
-#if defined(CONFIG_GREYBUS_CLICK_MANIFEST_BUILTIN) || defined(CONFIG_GREYBUS_CLICK_MANIFEST_CLICKID)
-	uint8_t *mnfb_fragment;
-	size_t mnfb_fragment_size;
-
-	r = manifest_get_fragment(&mnfb_fragment, &mnfb_fragment_size, 0);
-	if (r < 0) {
-		LOG_ERR("failed to get mnfb fragment 0");
-		goto out;
-	}
-
-	r = manifest_patch(&combined_mnfb, mnfb_fragment, mnfb_fragment_size);
-	if (r != true) {
-		LOG_ERR("failed to patch mnfb");
-		r = -EINVAL;
-		goto out;
-	}
-	r = manifest_get_fragment(&mnfb_fragment, &mnfb_fragment_size, 1);
-	if (r < 0) {
-		LOG_ERR("failed to get mnfb fragment 1");
-		goto out;
-	}
-
-	r = manifest_patch(&combined_mnfb, mnfb_fragment, mnfb_fragment_size);
-	if (r != true) {
-		LOG_ERR("failed to patch mnfb");
-		r = -EINVAL;
-		goto out;
-	}
-#endif
-	extern size_t manifest_get_num_cports(void);
 	num_cports = manifest_get_num_cports();
 	if (num_cports == 0) {
 		LOG_ERR("no cports are defined");

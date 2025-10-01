@@ -16,20 +16,6 @@
 		compatible = "zephyr,greybus";
 		greybus;
 	};
-
-	mikrobus0: mikrobus0 {
-		id = <0>;
-		compatible = "zephyr,greybus-mikrobusid";
-		cs-gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-		rst-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-	};
-
-	mikrobus1: mikrobus1 {
-		id = <1>;
-		compatible = "zephyr,greybus-mikrobusid";
-		cs-gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
-		rst-gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-	};
 };
 
 &flash0 {
