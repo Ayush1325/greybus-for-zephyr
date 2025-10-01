@@ -55,25 +55,6 @@ def get_mikrobus_descriptor(defines):
             break
     return mikrobus
 
-def get_property_descriptors(defines):
-    _property = {}
-    for key in defines:
-        val = defines[key]
-        if key.endswith('_P_compatible_IDX_0') and val == '"zephyr,greybus-property"':
-            node = key[:-len('_P_compatible_IDX_0')]
-            nsh = defines[node + '_P_name_string_id_IDX_0_PH']
-            nsi = int(defines[nsh + '_P_id'])
-            id_ = int(defines[node + '_P_id'])
-            _type = int(defines[node + '_P_type'])   
-            if node + '_P_value' in defines.keys():
-                value = re.sub(re.compile("/\*.*?\*/",re.DOTALL ) ,"" ,defines[node + '_P_value'])
-                value = value.replace('{','').replace('}','').strip()
-                value = list(map(int, value.split(',')))
-            else:
-                value = 0
-            _property[id_] = PropertyDescriptor(id_, nsi, _type, value, None)
-    return _property
-
 def get_bundle_descriptors(defines):
     bd = {}
     for key in defines:
@@ -120,7 +101,6 @@ def dt2mnfs(fn):
     mikrobus_desc = get_mikrobus_descriptor(defines)
     string_descs = get_string_descriptors(defines, interface_desc)
     bundle_descs = get_bundle_descriptors(defines)
-    property_descs = get_property_descriptors(defines)
     cport_descs = get_cport_descriptors(defines)
 
     m = Manifest()
@@ -134,8 +114,6 @@ def dt2mnfs(fn):
         m.add_bundle_desc(bundle_descs[d])
     for d in cport_descs:
         m.add_cport_desc(cport_descs[d])
-    for d in property_descs:
-        m.add_property_desc(property_descs[d])
     return m
 
 
