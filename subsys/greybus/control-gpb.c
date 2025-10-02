@@ -421,32 +421,54 @@ static uint8_t gb_control_timesync_get_last_event(struct gb_operation *operation
 	return gb_errno_to_op_result(retval);
 }
 
-static struct gb_operation_handler gb_control_handlers[] = {
-	GB_HANDLER(GB_CONTROL_TYPE_PROTOCOL_VERSION, gb_control_protocol_version),
-	GB_HANDLER(GB_CONTROL_TYPE_GET_MANIFEST_SIZE, gb_control_get_manifest_size),
-	GB_HANDLER(GB_CONTROL_TYPE_GET_MANIFEST, gb_control_get_manifest),
-	GB_HANDLER(GB_CONTROL_TYPE_CONNECTED, gb_control_connected),
-	GB_HANDLER(GB_CONTROL_TYPE_DISCONNECTED, gb_control_disconnected),
-	GB_HANDLER(GB_CONTROL_TYPE_INTERFACE_VERSION, gb_control_interface_version),
-	GB_HANDLER(GB_CONTROL_TYPE_DISCONNECTING, gb_control_disconnecting),
-	GB_HANDLER(GB_CONTROL_TYPE_BUNDLE_ACTIVATE, gb_control_bundle_activate),
-	GB_HANDLER(GB_CONTROL_TYPE_BUNDLE_SUSPEND, gb_control_bundle_suspend),
-	GB_HANDLER(GB_CONTROL_TYPE_BUNDLE_RESUME, gb_control_bundle_resume),
-	GB_HANDLER(GB_CONTROL_TYPE_BUNDLE_DEACTIVATE, gb_control_bundle_deactivate),
-	GB_HANDLER(GB_CONTROL_TYPE_INTF_SUSPEND_PREPARE, gb_control_intf_suspend_prepare),
-	GB_HANDLER(GB_CONTROL_TYPE_INTF_DEACTIVATE_PREPARE, gb_control_intf_deactivate_prepare),
+static uint8_t gb_control_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_CONTROL_TYPE_PROTOCOL_VERSION:
+		return gb_control_protocol_version(opr);
+	case GB_CONTROL_TYPE_GET_MANIFEST_SIZE:
+		return gb_control_get_manifest_size(opr);
+	case GB_CONTROL_TYPE_GET_MANIFEST:
+		return gb_control_get_manifest(opr);
+	case GB_CONTROL_TYPE_CONNECTED:
+		return gb_control_connected(opr);
+	case GB_CONTROL_TYPE_DISCONNECTED:
+		return gb_control_disconnected(opr);
+	case GB_CONTROL_TYPE_INTERFACE_VERSION:
+		return gb_control_interface_version(opr);
+	case GB_CONTROL_TYPE_DISCONNECTING:
+		return gb_control_disconnecting(opr);
+	case GB_CONTROL_TYPE_BUNDLE_ACTIVATE:
+		return gb_control_bundle_activate(opr);
+	case GB_CONTROL_TYPE_BUNDLE_SUSPEND:
+		return gb_control_bundle_suspend(opr);
+	case GB_CONTROL_TYPE_BUNDLE_RESUME:
+		return gb_control_bundle_resume(opr);
+	case GB_CONTROL_TYPE_BUNDLE_DEACTIVATE:
+		return gb_control_bundle_deactivate(opr);
+	case GB_CONTROL_TYPE_INTF_SUSPEND_PREPARE:
+		return gb_control_intf_suspend_prepare(opr);
+	case GB_CONTROL_TYPE_INTF_DEACTIVATE_PREPARE:
+		return gb_control_intf_deactivate_prepare(opr);
 	/* XXX SW-4136: see control-gb.h */
 	/*GB_HANDLER(GB_CONTROL_TYPE_INTF_POWER_STATE_SET, gb_control_intf_pwr_set),
 	GB_HANDLER(GB_CONTROL_TYPE_BUNDLE_POWER_STATE_SET, gb_control_bundle_pwr_set),*/
-	GB_HANDLER(GB_CONTROL_TYPE_TIMESYNC_ENABLE, gb_control_timesync_enable),
-	GB_HANDLER(GB_CONTROL_TYPE_TIMESYNC_DISABLE, gb_control_timesync_disable),
-	GB_HANDLER(GB_CONTROL_TYPE_TIMESYNC_AUTHORITATIVE, gb_control_timesync_authoritative),
-	GB_HANDLER(GB_CONTROL_TYPE_TIMESYNC_GET_LAST_EVENT, gb_control_timesync_get_last_event),
-};
+	case GB_CONTROL_TYPE_TIMESYNC_ENABLE:
+		return gb_control_timesync_enable(opr);
+	case GB_CONTROL_TYPE_TIMESYNC_DISABLE:
+		return gb_control_timesync_disable(opr);
+	case GB_CONTROL_TYPE_TIMESYNC_AUTHORITATIVE:
+		return gb_control_timesync_authoritative(opr);
+	case GB_CONTROL_TYPE_TIMESYNC_GET_LAST_EVENT:
+		return gb_control_timesync_get_last_event(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 struct gb_driver control_driver = {
-	.op_handlers = (struct gb_operation_handler *)gb_control_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_control_handlers),
+	.op_handler = gb_control_handler,
 };
 
 void gb_control_register(int cport, int bundle)

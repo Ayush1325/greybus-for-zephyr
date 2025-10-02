@@ -496,16 +496,30 @@ void gb_pwm_exit(unsigned int cport, struct gb_bundle *bundle)
 /*
  * This structure is to define each PWM protocol operation of handling function.
  */
-static struct gb_operation_handler gb_pwm_handlers[] = {
-	GB_HANDLER(GB_PWM_PROTOCOL_VERSION, gb_pwm_protocol_version),
-	GB_HANDLER(GB_PWM_PROTOCOL_COUNT, gb_pwm_protocol_count),
-	GB_HANDLER(GB_PWM_PROTOCOL_ACTIVATE, gb_pwm_protocol_activate),
-	GB_HANDLER(GB_PWM_PROTOCOL_DEACTIVATE, gb_pwm_protocol_deactivate),
-	GB_HANDLER(GB_PWM_PROTOCOL_CONFIG, gb_pwm_protocol_config),
-	GB_HANDLER(GB_PWM_PROTOCOL_POLARITY, gb_pwm_protocol_polarity),
-	GB_HANDLER(GB_PWM_PROTOCOL_ENABLE, gb_pwm_protocol_enable),
-	GB_HANDLER(GB_PWM_PROTOCOL_DISABLE, gb_pwm_protocol_disable),
-};
+static uint8_t gb_pwm_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_PWM_PROTOCOL_VERSION:
+		return gb_pwm_protocol_version(opr);
+	case GB_PWM_PROTOCOL_COUNT:
+		return gb_pwm_protocol_count(opr);
+	case GB_PWM_PROTOCOL_ACTIVATE:
+		return gb_pwm_protocol_activate(opr);
+	case GB_PWM_PROTOCOL_DEACTIVATE:
+		return gb_pwm_protocol_deactivate(opr);
+	case GB_PWM_PROTOCOL_CONFIG:
+		return gb_pwm_protocol_config(opr);
+	case GB_PWM_PROTOCOL_POLARITY:
+		return gb_pwm_protocol_polarity(opr);
+	case GB_PWM_PROTOCOL_ENABLE:
+		return gb_pwm_protocol_enable(opr);
+	case GB_PWM_PROTOCOL_DISABLE:
+		return gb_pwm_protocol_disable(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 /*
  * This structure of information is for PWM protocol fimware to register to
@@ -514,8 +528,7 @@ static struct gb_operation_handler gb_pwm_handlers[] = {
 static struct gb_driver gb_pwm_driver = {
 	.init = gb_pwm_init,
 	.exit = gb_pwm_exit,
-	.op_handlers = gb_pwm_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_pwm_handlers),
+	.op_handler = gb_pwm_handler,
 };
 
 /**

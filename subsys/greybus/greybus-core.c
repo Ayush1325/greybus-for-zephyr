@@ -207,47 +207,8 @@ static void op_mark_recv_time(struct gb_operation *operation)
 }
 #endif
 
-static int gb_compare_handlers(const void *data1, const void *data2)
-{
-	const struct gb_operation_handler *handler1 = data1;
-	const struct gb_operation_handler *handler2 = data2;
-	return (int)handler1->type - (int)handler2->type;
-}
-
-static struct gb_operation_handler *find_operation_handler(uint8_t type, unsigned int cport)
-{
-	struct gb_driver *driver = g_cport[cport].driver;
-	int l, r;
-
-	if (type == GB_INVALID_TYPE || !driver->op_handlers) {
-		return NULL;
-	}
-
-	/*
-	 * This function is performance sensitive, so let's use an inline binary
-	 * search algorithm. The libc version takes pointer to the comparison
-	 * function as argument which is then called via full-blown function
-	 * calls. The below version doesn't require calling any other function.
-	 */
-	l = 0;
-	r = driver->op_handlers_count - 1;
-	while (l <= r) {
-		int m = (l + r) / 2;
-		if (driver->op_handlers[m].type < type) {
-			l = m + 1;
-		} else if (driver->op_handlers[m].type > type) {
-			r = m - 1;
-		} else {
-			return &driver->op_handlers[m];
-		}
-	}
-
-	return NULL;
-}
-
 static void gb_process_request(struct gb_operation_hdr *hdr, struct gb_operation *operation)
 {
-	struct gb_operation_handler *op_handler;
 	uint8_t result;
 
 	if (hdr->type == GB_PING_TYPE) {
@@ -255,17 +216,10 @@ static void gb_process_request(struct gb_operation_hdr *hdr, struct gb_operation
 		return;
 	}
 
-	op_handler = find_operation_handler(hdr->type, operation->cport);
-	if (!op_handler) {
-		LOG_ERR("Cport %u: Invalid operation type %u", operation->cport, hdr->type);
-		gb_operation_send_response(operation, GB_OP_INVALID);
-		return;
-	}
-
 	operation->bundle = g_cport[operation->cport].driver->bundle;
+	result = g_cport[operation->cport].driver->op_handler(hdr->type, operation);
 
-	result = op_handler->handler(operation);
-	LOG_DBG("%s: %u", gb_handler_name(op_handler), result);
+	LOG_DBG("CPort: %d, Type: %d, Result: %d", operation->cport, hdr->type, result);
 
 	if (hdr->id) {
 		gb_operation_send_response(operation, result);
@@ -454,7 +408,7 @@ int greybus_rx_handler(unsigned int cport, void *data, size_t size)
 		return -EINVAL;
 	}
 
-	if (!g_cport[cport].driver || !g_cport[cport].driver->op_handlers) {
+	if (!g_cport[cport].driver || !g_cport[cport].driver->op_handler) {
 		LOG_ERR("Cport %u does not have a valid driver registered", cport);
 		return 0;
 	}
@@ -554,7 +508,7 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 		return -EEXIST;
 	}
 
-	if (!driver->op_handlers && driver->op_handlers_count > 0) {
+	if (!driver->op_handler) {
 		LOG_ERR("Invalid driver");
 		return -EINVAL;
 	}
@@ -596,11 +550,6 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 			LOG_ERR("Can not init %s", gb_driver_name(driver));
 			return retval;
 		}
-	}
-
-	if (driver->op_handlers) {
-		qsort(driver->op_handlers, driver->op_handlers_count, sizeof(*driver->op_handlers),
-		      gb_compare_handlers);
 	}
 
 	g_cport[cport].exit_worker = false;

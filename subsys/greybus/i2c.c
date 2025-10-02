@@ -29,14 +29,16 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
-#include <errno.h>
 #include <greybus/greybus.h>
 #include <greybus/platform.h>
 #include <stdlib.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 #include "i2c-gb.h"
+
+LOG_MODULE_REGISTER(greybus_i2c, CONFIG_GREYBUS_LOG_LEVEL);
 
 static uint8_t gb_i2c_protocol_version(struct gb_operation *operation)
 {
@@ -175,17 +177,25 @@ static void gb_i2c_exit(unsigned int cport, struct gb_bundle *bundle)
 	ARG_UNUSED(bundle);
 }
 
-static struct gb_operation_handler gb_i2c_handlers[] = {
-	GB_HANDLER(GB_I2C_PROTOCOL_VERSION, gb_i2c_protocol_version),
-	GB_HANDLER(GB_I2C_PROTOCOL_FUNCTIONALITY, gb_i2c_protocol_functionality),
-	GB_HANDLER(GB_I2C_PROTOCOL_TRANSFER, gb_i2c_protocol_transfer),
-};
+static uint8_t gb_i2c_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_I2C_PROTOCOL_VERSION:
+		return gb_i2c_protocol_version(opr);
+	case GB_I2C_PROTOCOL_FUNCTIONALITY:
+		return gb_i2c_protocol_functionality(opr);
+	case GB_I2C_PROTOCOL_TRANSFER:
+		return gb_i2c_protocol_transfer(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_i2c_driver = {
 	.init = gb_i2c_init,
 	.exit = gb_i2c_exit,
-	.op_handlers = gb_i2c_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_i2c_handlers),
+	.op_handler = gb_i2c_handler,
 };
 
 void gb_i2c_register(int cport, int bundle)

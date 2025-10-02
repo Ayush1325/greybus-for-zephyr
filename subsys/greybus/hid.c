@@ -728,21 +728,33 @@ static void gb_hid_exit(unsigned int cport, struct gb_bundle *bundle)
 /**
  * @brief Greybus HID protocol operation handler
  */
-static struct gb_operation_handler gb_hid_handlers[] = {
-	GB_HANDLER(GB_HID_TYPE_PROTOCOL_VERSION, gb_hid_protocol_version),
-	GB_HANDLER(GB_HID_TYPE_GET_DESC, gb_hid_get_descriptor),
-	GB_HANDLER(GB_HID_TYPE_GET_REPORT_DESC, gb_hid_get_report_descriptor),
-	GB_HANDLER(GB_HID_TYPE_PWR_ON, gb_hid_power_on),
-	GB_HANDLER(GB_HID_TYPE_PWR_OFF, gb_hid_power_off),
-	GB_HANDLER(GB_HID_TYPE_GET_REPORT, gb_hid_get_report),
-	GB_HANDLER(GB_HID_TYPE_SET_REPORT, gb_hid_set_report),
-};
+static uint8_t gb_hid_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_HID_TYPE_PROTOCOL_VERSION:
+		return gb_hid_protocol_version(opr);
+	case GB_HID_TYPE_GET_DESC:
+		return gb_hid_get_descriptor(opr);
+	case GB_HID_TYPE_GET_REPORT_DESC:
+		return gb_hid_get_report_descriptor(opr);
+	case GB_HID_TYPE_PWR_ON:
+		return gb_hid_power_on(opr);
+	case GB_HID_TYPE_PWR_OFF:
+		return gb_hid_power_off(opr);
+	case GB_HID_TYPE_GET_REPORT:
+		return gb_hid_get_report(opr);
+	case GB_HID_TYPE_SET_REPORT:
+		return gb_hid_set_report(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_hid_driver = {
 	.init = gb_hid_init,
 	.exit = gb_hid_exit,
-	.op_handlers = gb_hid_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_hid_handlers),
+	.op_handler = gb_hid_handler,
 };
 
 /**

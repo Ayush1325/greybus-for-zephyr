@@ -448,19 +448,29 @@ static void gb_sdio_exit(unsigned int cport, struct gb_bundle *bundle)
 /**
  * @brief Greybus SDIO protocol operation handler
  */
-static struct gb_operation_handler gb_sdio_handlers[] = {
-	GB_HANDLER(GB_SDIO_TYPE_PROTOCOL_VERSION, gb_sdio_protocol_version),
-	GB_HANDLER(GB_SDIO_TYPE_PROTOCOL_GET_CAPABILITIES, gb_sdio_protocol_get_capabilities),
-	GB_HANDLER(GB_SDIO_TYPE_PROTOCOL_SET_IOS, gb_sdio_protocol_set_ios),
-	GB_HANDLER(GB_SDIO_TYPE_PROTOCOL_COMMAND, gb_sdio_protocol_command),
-	GB_HANDLER(GB_SDIO_TYPE_PROTOCOL_TRANSFER, gb_sdio_protocol_transfer),
-};
+static uint8_t gb_sdio_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_SDIO_TYPE_PROTOCOL_VERSION:
+		return gb_sdio_protocol_version(opr);
+	case GB_SDIO_TYPE_PROTOCOL_GET_CAPABILITIES:
+		return gb_sdio_protocol_get_capabilities(opr);
+	case GB_SDIO_TYPE_PROTOCOL_SET_IOS:
+		return gb_sdio_protocol_set_ios(opr);
+	case GB_SDIO_TYPE_PROTOCOL_COMMAND:
+		return gb_sdio_protocol_command(opr);
+	case GB_SDIO_TYPE_PROTOCOL_TRANSFER:
+		return gb_sdio_protocol_transfer(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver sdio_driver = {
 	.init = gb_sdio_init,
 	.exit = gb_sdio_exit,
-	.op_handlers = gb_sdio_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_sdio_handlers),
+	.op_handler = gb_sdio_handler,
 };
 
 /**

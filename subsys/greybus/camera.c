@@ -498,13 +498,24 @@ static void gb_camera_exit(unsigned int cport, struct gb_bundle *bundle)
 /**
  * @brief Greybus Camera Protocol operation handler
  */
-static struct gb_operation_handler gb_camera_handlers[] = {
-	GB_HANDLER(GB_CAMERA_TYPE_PROTOCOL_VERSION, gb_camera_protocol_version),
-	GB_HANDLER(GB_CAMERA_TYPE_CAPABILITIES, gb_camera_capabilities),
-	GB_HANDLER(GB_CAMERA_TYPE_CONFIGURE_STREAMS, gb_camera_configure_streams),
-	GB_HANDLER(GB_CAMERA_TYPE_CAPTURE, gb_camera_capture),
-	GB_HANDLER(GB_CAMERA_TYPE_FLUSH, gb_camera_flush),
-};
+static uint8_t gb_camera_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_CAMERA_TYPE_PROTOCOL_VERSION:
+		return gb_camera_protocol_version(opr);
+	case GB_CAMERA_TYPE_CAPABILITIES:
+		return gb_camera_capabilities(opr);
+	case GB_CAMERA_TYPE_CONFIGURE_STREAMS:
+		return gb_camera_configure_streams(opr);
+	case GB_CAMERA_TYPE_CAPTURE:
+		return gb_camera_capture(opr);
+	case GB_CAMERA_TYPE_FLUSH:
+		return gb_camera_flush(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 /**
  * @brief Greybus Camera Protocol driver ops
@@ -512,8 +523,7 @@ static struct gb_operation_handler gb_camera_handlers[] = {
 static struct gb_driver gb_camera_driver = {
 	.init = gb_camera_init,
 	.exit = gb_camera_exit,
-	.op_handlers = gb_camera_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_camera_handlers),
+	.op_handler = gb_camera_handler,
 };
 
 /**

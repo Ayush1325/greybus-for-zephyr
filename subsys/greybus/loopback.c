@@ -402,16 +402,25 @@ static uint8_t gb_loopback_ping_sink_req_cb(struct gb_operation *operation)
 	return GB_OP_SUCCESS;
 }
 
-static struct gb_operation_handler gb_loopback_handlers[] = {
-	GB_HANDLER(GB_LOOPBACK_TYPE_PROTOCOL_VERSION, gb_loopback_protocol_ver_cb),
-	GB_HANDLER(GB_LOOPBACK_TYPE_PING, gb_loopback_ping_sink_req_cb),
-	GB_HANDLER(GB_LOOPBACK_TYPE_TRANSFER, gb_loopback_transfer_req_cb),
-	GB_HANDLER(GB_LOOPBACK_TYPE_SINK, gb_loopback_ping_sink_req_cb),
-};
+static uint8_t gb_loopback_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_LOOPBACK_TYPE_PROTOCOL_VERSION:
+		return gb_loopback_protocol_ver_cb(opr);
+	case GB_LOOPBACK_TYPE_PING:
+		return gb_loopback_ping_sink_req_cb(opr);
+	case GB_LOOPBACK_TYPE_TRANSFER:
+		return gb_loopback_transfer_req_cb(opr);
+	case GB_LOOPBACK_TYPE_SINK:
+		return gb_loopback_ping_sink_req_cb(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 struct gb_driver loopback_driver = {
-	.op_handlers = (struct gb_operation_handler *)gb_loopback_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_loopback_handlers),
+	.op_handler = gb_loopback_handler,
 };
 
 #ifdef CONFIG_GREYBUS_FEATURE_HAVE_TIMESTAMPS

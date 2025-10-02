@@ -68,18 +68,7 @@ enum gb_event {
 struct gb_operation;
 
 typedef void (*gb_operation_callback)(struct gb_operation *operation);
-typedef uint8_t (*gb_operation_handler_t)(struct gb_operation *operation);
-
-#define GB_HANDLER(t, h)                                                                           \
-	{                                                                                          \
-		.type = t, .handler = h, .name = #h,                                               \
-	}
-
-struct gb_operation_handler {
-	uint8_t type;
-	gb_operation_handler_t handler;
-	const char *name;
-};
+typedef uint8_t (*gb_operation_handler_t)(uint8_t type, struct gb_operation *operation);
 
 struct gb_transport_backend {
 	void (*init)(void);
@@ -145,9 +134,8 @@ struct gb_driver {
 	void (*connected)(unsigned int cport);
 	void (*disconnected)(unsigned int cport);
 
-	struct gb_operation_handler *op_handlers;
+	gb_operation_handler_t op_handler;
 
-	size_t op_handlers_count;
 	const char *name;
 
 	struct gb_bundle *bundle;
@@ -197,11 +185,6 @@ static inline struct gb_operation *gb_operation_get_response_op(struct gb_operat
 static inline const char *gb_driver_name(struct gb_driver *driver)
 {
 	return driver->name;
-}
-
-static inline const char *gb_handler_name(struct gb_operation_handler *handler)
-{
-	return handler->name;
 }
 
 int gb_init(struct gb_transport_backend *transport);

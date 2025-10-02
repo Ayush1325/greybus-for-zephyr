@@ -1656,35 +1656,57 @@ static void gb_audio_exit(unsigned int mgmt_cport, struct gb_bundle *bundle)
 	info->initialized = false;
 }
 
-static struct gb_operation_handler gb_audio_mgmt_handlers[] = {
-	GB_HANDLER(GB_AUDIO_TYPE_PROTOCOL_VERSION, gb_audio_protocol_version_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE, gb_audio_get_topology_size_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_GET_TOPOLOGY, gb_audio_get_topology_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_GET_CONTROL, gb_audio_get_control_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_SET_CONTROL, gb_audio_set_control_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_ENABLE_WIDGET, gb_audio_enable_widget_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_DISABLE_WIDGET, gb_audio_disable_widget_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_GET_PCM, gb_audio_get_pcm_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_SET_PCM, gb_audio_set_pcm_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_SET_TX_DATA_SIZE, gb_audio_set_tx_data_size_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_GET_TX_DELAY, gb_audio_get_tx_delay_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_ACTIVATE_TX, gb_audio_activate_tx_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_DEACTIVATE_TX, gb_audio_deactivate_tx_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_SET_RX_DATA_SIZE, gb_audio_set_rx_data_size_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_GET_RX_DELAY, gb_audio_get_rx_delay_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_ACTIVATE_RX, gb_audio_activate_rx_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_DEACTIVATE_RX, gb_audio_deactivate_rx_handler),
+static uint8_t gb_audio_mgmt_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_AUDIO_TYPE_PROTOCOL_VERSION:
+		return gb_audio_protocol_version_handler(opr);
+	case GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE:
+		return gb_audio_get_topology_size_handler(opr);
+	case GB_AUDIO_TYPE_GET_TOPOLOGY:
+		return gb_audio_get_topology_handler(opr);
+	case GB_AUDIO_TYPE_GET_CONTROL:
+		return gb_audio_get_control_handler(opr);
+	case GB_AUDIO_TYPE_SET_CONTROL:
+		return gb_audio_set_control_handler(opr);
+	case GB_AUDIO_TYPE_ENABLE_WIDGET:
+		return gb_audio_enable_widget_handler(opr);
+	case GB_AUDIO_TYPE_DISABLE_WIDGET:
+		return gb_audio_disable_widget_handler(opr);
+	case GB_AUDIO_TYPE_GET_PCM:
+		return gb_audio_get_pcm_handler(opr);
+	case GB_AUDIO_TYPE_SET_PCM:
+		return gb_audio_set_pcm_handler(opr);
+	case GB_AUDIO_TYPE_SET_TX_DATA_SIZE:
+		return gb_audio_set_tx_data_size_handler(opr);
+	case GB_AUDIO_TYPE_GET_TX_DELAY:
+		return gb_audio_get_tx_delay_handler(opr);
+	case GB_AUDIO_TYPE_ACTIVATE_TX:
+		return gb_audio_deactivate_tx_handler(opr);
+	case GB_AUDIO_TYPE_DEACTIVATE_TX:
+		return gb_audio_deactivate_tx_handler(opr);
+	case GB_AUDIO_TYPE_SET_RX_DATA_SIZE:
+		return gb_audio_set_rx_data_size_handler(opr);
+	case GB_AUDIO_TYPE_GET_RX_DELAY:
+		return gb_audio_get_rx_delay_handler(opr);
+	case GB_AUDIO_TYPE_ACTIVATE_RX:
+		return gb_audio_activate_rx_handler(opr);
+	case GB_AUDIO_TYPE_DEACTIVATE_RX:
+		return gb_audio_deactivate_rx_handler(opr);
 	/* GB_AUDIO_TYPE_JACK_EVENT should only be received by the AP */
 	/* GB_AUDIO_TYPE_BUTTON_EVENT should only be received by the AP */
 	/* GB_AUDIO_TYPE_STREAMING_EVENT should only be received by the AP */
 	/* GB_AUDIO_TYPE_SEND_DATA should only be sent on a Data Connection */
-};
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_audio_mgmt_driver = {
 	.init = gb_audio_init,
 	.exit = gb_audio_exit,
-	.op_handlers = gb_audio_mgmt_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_audio_mgmt_handlers),
+	.op_handler = gb_audio_mgmt_handler,
 };
 
 void gb_audio_mgmt_register(int mgmt_cport, int bundle)
@@ -1751,14 +1773,21 @@ static uint8_t gb_audio_send_data_handler(struct gb_operation *operation)
 	return GB_OP_SUCCESS;
 }
 
-static struct gb_operation_handler gb_audio_data_handlers[] = {
-	GB_HANDLER(GB_AUDIO_TYPE_PROTOCOL_VERSION, gb_audio_protocol_version_handler),
-	GB_HANDLER(GB_AUDIO_TYPE_SEND_DATA, gb_audio_send_data_handler),
-};
+static uint8_t gb_audio_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_AUDIO_TYPE_PROTOCOL_VERSION:
+		return gb_audio_protocol_version_handler(opr);
+	case GB_AUDIO_TYPE_SEND_DATA:
+		return gb_audio_send_data_handler(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_audio_data_driver = {
-	.op_handlers = gb_audio_data_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_audio_data_handlers),
+	.op_handler = gb_audio_handler,
 };
 
 void gb_audio_data_register(int data_cport, int bundle)

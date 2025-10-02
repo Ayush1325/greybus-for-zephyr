@@ -519,21 +519,40 @@ static uint8_t gb_gpio_irq_type(struct gb_operation *operation)
 		gpio_pin_interrupt_configure(dev, request->which, mode | trigger));
 }
 
-static struct gb_operation_handler gb_gpio_handlers[] = {
-	GB_HANDLER(GB_GPIO_TYPE_PROTOCOL_VERSION, gb_gpio_protocol_version),
-	GB_HANDLER(GB_GPIO_TYPE_LINE_COUNT, gb_gpio_line_count),
-	GB_HANDLER(GB_GPIO_TYPE_ACTIVATE, gb_gpio_activate),
-	GB_HANDLER(GB_GPIO_TYPE_DEACTIVATE, gb_gpio_deactivate),
-	GB_HANDLER(GB_GPIO_TYPE_GET_DIRECTION, gb_gpio_get_direction),
-	GB_HANDLER(GB_GPIO_TYPE_DIRECTION_IN, gb_gpio_direction_in),
-	GB_HANDLER(GB_GPIO_TYPE_DIRECTION_OUT, gb_gpio_direction_out),
-	GB_HANDLER(GB_GPIO_TYPE_GET_VALUE, gb_gpio_get_value),
-	GB_HANDLER(GB_GPIO_TYPE_SET_VALUE, gb_gpio_set_value),
-	GB_HANDLER(GB_GPIO_TYPE_SET_DEBOUNCE, gb_gpio_set_debounce),
-	GB_HANDLER(GB_GPIO_TYPE_IRQ_TYPE, gb_gpio_irq_type),
-	GB_HANDLER(GB_GPIO_TYPE_IRQ_MASK, gb_gpio_irq_mask),
-	GB_HANDLER(GB_GPIO_TYPE_IRQ_UNMASK, gb_gpio_irq_unmask),
-};
+static uint8_t gb_gpio_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_GPIO_TYPE_PROTOCOL_VERSION:
+		return gb_gpio_protocol_version(opr);
+	case GB_GPIO_TYPE_LINE_COUNT:
+		return gb_gpio_line_count(opr);
+	case GB_GPIO_TYPE_ACTIVATE:
+		return gb_gpio_activate(opr);
+	case GB_GPIO_TYPE_DEACTIVATE:
+		return gb_gpio_deactivate(opr);
+	case GB_GPIO_TYPE_GET_DIRECTION:
+		return gb_gpio_get_direction(opr);
+	case GB_GPIO_TYPE_DIRECTION_IN:
+		return gb_gpio_direction_in(opr);
+	case GB_GPIO_TYPE_DIRECTION_OUT:
+		return gb_gpio_direction_out(opr);
+	case GB_GPIO_TYPE_GET_VALUE:
+		return gb_gpio_get_value(opr);
+	case GB_GPIO_TYPE_SET_VALUE:
+		return gb_gpio_set_value(opr);
+	case GB_GPIO_TYPE_SET_DEBOUNCE:
+		return gb_gpio_set_debounce(opr);
+	case GB_GPIO_TYPE_IRQ_TYPE:
+		return gb_gpio_irq_type(opr);
+	case GB_GPIO_TYPE_IRQ_MASK:
+		return gb_gpio_irq_mask(opr);
+	case GB_GPIO_TYPE_IRQ_UNMASK:
+		return gb_gpio_irq_unmask(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static int gb_gpio_init(unsigned int cport, struct gb_bundle *bundle)
 {
@@ -555,8 +574,7 @@ static void gb_gpio_exit(unsigned int cport, struct gb_bundle *bundle)
 struct gb_driver gpio_driver = {
 	.init = gb_gpio_init,
 	.exit = gb_gpio_exit,
-	.op_handlers = (struct gb_operation_handler *)gb_gpio_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_gpio_handlers),
+	.op_handler = gb_gpio_handler,
 };
 
 void gb_gpio_register(int cport, int bundle)
