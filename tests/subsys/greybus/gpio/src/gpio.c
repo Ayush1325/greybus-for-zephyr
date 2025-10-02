@@ -244,7 +244,7 @@ static void tx_rx(const struct gb_operation_hdr *req, struct gb_operation_hdr *r
 			 */
 			continue;
 		}
-		if (rsp_size - hdr_size > 0) {
+		if (rsp_size > hdr_size) {
 			r = recv(fd, (uint8_t *)rsp + hdr_size, rsp_size - hdr_size, 0);
 			zassert_not_equal(r, -1, "recv: %s", errno);
 			zassert_equal(r, rsp_size - hdr_size, "expected: %u actual: %d",
