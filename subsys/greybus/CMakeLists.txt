@@ -51,8 +51,6 @@ if(CONFIG_GREYBUS_TLS_BUILTIN)
     ${gen_dir}/greybus_tls_builtin_server_privkey.inc)
 endif()
 
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP_MULTIPLEX
-                             platform/transport-tcpip-multiplex.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP
                              platform/transport-tcpip.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART

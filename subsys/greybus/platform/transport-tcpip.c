@@ -1,75 +1,16 @@
-/*
- * Copyright (c) 2020 Friedt Professional Engineering Services, Inc
- *
- * SPDX-License-Identifier: BSD-3-Clause
- */
-
-#include <errno.h>
-#include <zephyr/net/dns_sd.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <string.h>
-#include <zephyr/kernel.h>
-#include <zephyr/sys/dlist.h>
-
-#if defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) || defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) ||        \
-	defined(CONFIG_BOARD_NRF52_BSIM)
-
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <poll.h>
-#include <pthread.h>
-#include <zephyr/sys/byteorder.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
-/*
- * There seem to be a number of conflicts between Linux and
- * Zephyr headers for networking things. So a few things are
- * defined manually.
- */
-#define IPPROTO_TLS_1_2          258
-#define TLS_SEC_TAG_LIST         1
-#define TLS_HOSTNAME             2
-#define TLS_PEER_VERIFY          5
-#define TLS_PEER_VERIFY_NONE     0
-#define TLS_PEER_VERIFY_OPTIONAL 1
-#define TLS_PEER_VERIFY_REQUIRED 2
-
-typedef int sec_tag_t;
-
-static inline struct sockaddr_in *net_sin(struct sockaddr *sa)
-{
-	return (struct sockaddr_in *)sa;
-}
-
-static inline struct sockaddr_in6 *net_sin6(struct sockaddr *sa)
-{
-	return (struct sockaddr_in6 *)sa;
-}
-
-/* For some reason, not declared even with _GNU_SOURCE */
-extern int pthread_setname_np(pthread_t thread, const char *name);
-
-extern int usleep(useconds_t usec);
-
-#else
-
 #include <greybus/greybus.h>
-#include <greybus-utils/manifest.h>
-#include <zephyr/posix/unistd.h>
-#include <zephyr/posix/pthread.h>
+#include <zephyr/kernel.h>
+#include <zephyr/net/dns_sd.h>
 #include <zephyr/net/net_ip.h>
+#include <zephyr/net/socket.h>
 
-#endif
+#include "certificate.h"
+#include "transport.h"
 
-#include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 
-#include "transport.h"
-#include "certificate.h"
+#define GB_TRANSPORT_TCPIP_BASE_PORT 4242
+#define GB_TRANSPORT_TCPIP_BACKLOG   10
 
 #ifndef CONFIG_GREYBUS_ENABLE_TLS
 #define CONFIG_GREYBUS_TLS_HOSTNAME ""
@@ -78,28 +19,9 @@ LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 /* Based on UniPro, from Linux */
 #define CPORT_ID_MAX 4095
 
-#define GB_TRANSPORT_TCPIP_BASE_PORT 4242
-#define GB_TRANSPORT_TCPIP_BACKLOG   10
-
-#ifdef CONFIG_GREYBUS_ENABLE_TLS
-#define XPORT "TLS"
-#else
-#define XPORT "TCP/IP"
-#endif
-
-enum fd_context_type {
-	FD_CONTEXT_SERVER = 1,
-	FD_CONTEXT_CLIENT = 2,
-	FD_CONTEXT_ANY = 3,
-};
-
-struct fd_context {
-	sys_dnode_t node;
-	int fd;
-	int cport;
-	bool listen;
-	enum fd_context_type type;
-};
+#define GB_TRANS_HEAP_SIZE         2048
+#define GB_TRANS_RX_STACK_SIZE     2048
+#define GB_TRANS_RX_STACK_PRIORITY 6
 
 #ifdef CONFIG_GREYBUS_ENABLE_TLS
 DNS_SD_REGISTER_TCP_SERVICE(gb_service_advertisement, CONFIG_NET_HOSTNAME, "_greybuss", "local",
@@ -109,509 +31,187 @@ DNS_SD_REGISTER_TCP_SERVICE(gb_service_advertisement, CONFIG_NET_HOSTNAME, "_gre
 			    DNS_SD_EMPTY_TXT, GB_TRANSPORT_TCPIP_BASE_PORT);
 #endif /* CONFIG_GREYBUS_ENABLE_TLS */
 
-static sys_dlist_t fd_list;
-static pthread_mutex_t fd_list_mutex;
-static pthread_t accept_thread;
+K_HEAP_DEFINE(gb_trans_heap, GB_TRANS_HEAP_SIZE);
+K_THREAD_STACK_DEFINE(gb_trans_rx_stack, GB_TRANS_RX_STACK_SIZE);
 
-static struct fd_context *fd_context_new(int fd, int cport, enum fd_context_type type)
+/*
+ * struct gb_message_in_transport: The format of message over socket
+ *
+ * @cport: The cport on the node
+ * @msg: Pointer to start of message
+ */
+struct gb_message_in_transport {
+	uint16_t cport;
+	struct gb_operation_hdr *msg;
+};
+
+/*
+ * struct gb_trans_ctx: Transport Context
+ *
+ * @rx_thread: rx_thread
+ * @server_sock: socket on which the server listens for connections
+ * @client_sock: socket with connection to a client
+ */
+struct gb_trans_ctx {
+	struct k_thread rx_thread;
+	int server_sock;
+	int client_sock;
+};
+
+static struct gb_trans_ctx ctx;
+
+/*
+ * Helper to read data from socket
+ */
+static int read_data(int sock, void *data, size_t len)
 {
-	struct fd_context *ctx = NULL;
+	int ret, received = 0;
 
-	if (fd < 0) {
-		LOG_ERR("invalid fd %d", fd);
+	while (received < len) {
+		ret = zsock_recv(sock, received + (char *)data, len - received, 0);
+		if (ret < 0) {
+			LOG_ERR("Failed to receive data");
+			return ret;
+		} else if (ret == 0) {
+			/* Socket was closed by peer */
+			return 0;
+		}
+		received += ret;
+	}
+	return received;
+}
+
+
+/*
+ * Helper to write data to socket
+ */
+static int write_data(int sock, const void *data, size_t len)
+{
+	int ret, transmitted = 0;
+
+	while (transmitted < len) {
+		ret = zsock_send(sock, transmitted + (char *)data, len - transmitted, 0);
+		if (ret < 0) {
+			LOG_ERR("Failed to transmit data");
+			return ret;
+		}
+		transmitted += ret;
+	}
+	return transmitted;
+}
+
+/*
+ * Helper to allocation a greybus message
+ */
+static struct gb_operation_hdr *gb_message_alloc(struct gb_operation_hdr *hdr)
+{
+	struct gb_operation_hdr *msg = k_heap_alloc(&gb_trans_heap, hdr->size, K_NO_WAIT);
+	if (!msg) {
 		return NULL;
 	}
-
-	if (cport < 0 || cport > CPORT_ID_MAX) {
-		LOG_ERR("invalid cport %d", cport);
-		return NULL;
-	}
-
-	if (!(type == FD_CONTEXT_SERVER || type == FD_CONTEXT_CLIENT)) {
-		LOG_ERR("invalid type %u", type);
-		return NULL;
-	}
-
-	ctx = calloc(1, sizeof(*ctx));
-	if (ctx == NULL) {
-		LOG_ERR("failed to allocate context");
-		return NULL;
-	}
-
-	ctx->fd = fd;
-	ctx->cport = cport;
-	ctx->type = type;
-	sys_dnode_init(&ctx->node);
-
-	return ctx;
+	memcpy(msg, hdr, sizeof(*hdr));
+	return msg;
 }
 
-static void fd_context_delete(struct fd_context *ctx)
+/*
+ * Helper to free a greybus message
+ */
+static void gb_message_dealloc(struct gb_operation_hdr *msg)
 {
-	if (ctx == NULL) {
-		return;
-	}
-
-	close(ctx->fd);
-	free(ctx);
+	k_heap_free(&gb_trans_heap, msg);
 }
 
-static bool fd_context_insert(int fd, int cport, enum fd_context_type type)
+static size_t gb_message_payload_len(const struct gb_operation_hdr *msg)
 {
-	struct fd_context *ctx;
-	struct fd_context *cnode;
-	int r;
-	bool success = false;
-
-	ctx = fd_context_new(fd, cport, type);
-	if (ctx == NULL) {
-		goto out;
-	}
-
-	r = pthread_mutex_lock(&fd_list_mutex);
-	if (r != 0) {
-		LOG_ERR("failed to lock fd_list_mutex (%d)", r);
-		goto out;
-	}
-
-	SYS_DLIST_FOR_EACH_CONTAINER(&fd_list, cnode, node) {
-		/* check for uniqueness on the fd key */
-		if (cnode->fd == ctx->fd) {
-			LOG_ERR("fd_list already contains fd %d", ctx->fd);
-			goto unlock;
-		}
-	}
-
-	sys_dlist_append(&fd_list, &ctx->node);
-	success = true;
-
-unlock:
-	pthread_mutex_unlock(&fd_list_mutex);
-out:
-	if (!success) {
-		free(ctx);
-	}
-	return success;
+	return msg->size - sizeof(struct gb_operation_hdr);
 }
 
-static void fd_context_erase_inner(struct fd_context *ctx)
+/*
+ * Helper to receive a greybus message from socket
+ */
+static struct gb_message_in_transport gb_message_receive(int sock, bool *flag)
 {
-	if (ctx == NULL) {
-		return;
+	int ret;
+	struct gb_operation_hdr hdr;
+	struct gb_message_in_transport msg;
+
+	ret = read_data(sock, &msg.cport, sizeof(msg.cport));
+	if (ret != sizeof(msg.cport)) {
+		*flag = ret == 0;
+		goto early_exit;
 	}
-	sys_dlist_remove(&ctx->node);
-	fd_context_delete(ctx);
-}
+	msg.cport = sys_le16_to_cpu(msg.cport);
 
-static bool fd_context_erase(int fd)
-{
-	struct fd_context *cnode;
-	int r;
-	bool success = false;
-	struct fd_context *ctx = NULL;
-
-	r = pthread_mutex_lock(&fd_list_mutex);
-	if (r != 0) {
-		LOG_ERR("failed to lock fd_list_mutex (%d)", r);
-		goto out;
+	ret = read_data(sock, &hdr, sizeof(hdr));
+	if (ret != sizeof(hdr)) {
+		*flag = ret == 0;
+		goto early_exit;
 	}
 
-	SYS_DLIST_FOR_EACH_CONTAINER(&fd_list, cnode, node) {
-		if (cnode->fd == fd) {
-			ctx = cnode;
-			break;
-		}
+	msg.msg = gb_message_alloc(&hdr);
+	if (!msg.msg) {
+		LOG_ERR("Failed to allocate node message");
+		goto early_exit;
 	}
 
-	if (ctx == NULL) {
-		LOG_DBG("fd %d is not in list", fd);
-		goto unlock;
-	}
-
-	fd_context_erase_inner(ctx);
-	success = true;
-
-unlock:
-	pthread_mutex_unlock(&fd_list_mutex);
-out:
-	return success;
-}
-
-static void fd_context_clear(void)
-{
-	int r;
-	struct fd_context *ctx;
-	struct fd_context *cnode;
-
-	r = pthread_mutex_lock(&fd_list_mutex);
-	if (r != 0) {
-		LOG_ERR("failed to lock fd_list_mutex (%d)", r);
-		return;
-	}
-
-	for (ctx = SYS_DLIST_PEEK_HEAD_CONTAINER(&fd_list, cnode, node); ctx != NULL;
-	     ctx = SYS_DLIST_PEEK_HEAD_CONTAINER(&fd_list, cnode, node)) {
-		fd_context_erase_inner(ctx);
-	}
-
-	pthread_mutex_unlock(&fd_list_mutex);
-}
-
-static struct fd_context *fd_context_find(int fd, int cport, enum fd_context_type type)
-{
-	struct fd_context *cnode;
-	int r;
-	struct fd_context *ctx = NULL;
-
-	r = pthread_mutex_lock(&fd_list_mutex);
-	if (r != 0) {
-		LOG_ERR("failed to lock fd_list_mutex (%d)", r);
-		goto out;
-	}
-
-	SYS_DLIST_FOR_EACH_CONTAINER(&fd_list, cnode, node) {
-		if (!(fd == -1 || fd == cnode->fd)) {
-			continue;
-		}
-
-		if (!(cport == -1 || cport == cnode->cport)) {
-			continue;
-		}
-
-		if ((type & cnode->type) == 0) {
-			continue;
-		}
-
-		ctx = cnode;
-		break;
-	}
-
-	pthread_mutex_unlock(&fd_list_mutex);
-
-out:
-	return ctx;
-}
-
-static inline struct fd_context *fd_to_context(int fd)
-{
-	return fd_context_find(fd, -1, FD_CONTEXT_ANY);
-}
-
-static inline struct fd_context *cport_to_server_context(int cport)
-{
-	return fd_context_find(-1, cport, FD_CONTEXT_SERVER);
-}
-
-static int getMessage(int fd, struct gb_operation_hdr **msg);
-static int sendMessage(int fd, struct gb_operation_hdr *msg);
-
-static void accept_new_connection(struct fd_context *ctx)
-{
-	int fd;
-	struct sockaddr_in6 addr = {
-		.sin6_family = AF_INET6,
-		.sin6_addr = in6addr_any,
-	};
-	socklen_t addrlen;
-	static char addrstr[INET6_ADDRSTRLEN];
-	char *addrstrp;
-
-	__ASSERT_NO_MSG(ctx->type == FD_CONTEXT_SERVER);
-
-	addrlen = sizeof(addr);
-	fd = accept(ctx->fd, (struct sockaddr *)&addr, &addrlen);
-	if (fd == -1) {
-		LOG_ERR("accept: %d", errno);
-		return;
-	}
-
-	memset(addrstr, '\0', sizeof(addrstr));
-	addrstrp = (char *)inet_ntop(addr.sin6_family, &addr.sin6_addr, addrstr, sizeof(addrstr));
-	if (NULL == addrstrp) {
-		LOG_ERR("inet_ntop: %d", errno);
-		return;
-	}
-
-	if (!fd_context_insert(fd, ctx->cport, FD_CONTEXT_CLIENT)) {
-		close(fd);
-		return;
-	}
-
-	LOG_DBG("cport %d accepted connection from [%s]:%d as fd %d", ctx->cport, addrstr,
-		ntohs(addr.sin6_port), fd);
-}
-
-static void handle_client_input(struct fd_context *ctx)
-{
-	int r;
-	struct gb_operation_hdr *msg = NULL;
-
-	r = getMessage(ctx->fd, &msg);
-	if (r == 0) {
-		/* Connection was shut down gracefully */
-		goto close_conn;
-	}
-
-	if (r < 0) {
-		LOG_ERR("fd %d returned %d", ctx->fd, r);
-		goto close_conn;
-	}
-
-	r = greybus_rx_handler(ctx->cport, msg, sys_le16_to_cpu(msg->size));
-	if (r == 0) {
-		/* Message handled properly */
+	ret = read_data(sock, (uint8_t *)msg.msg + sizeof(hdr), gb_message_payload_len(msg.msg));
+	if (ret != gb_message_payload_len(msg.msg)) {
+		*flag = ret == 0;
 		goto free_msg;
 	}
 
-	__ASSERT_NO_MSG(r < 0);
-
-	LOG_ERR("cport %u failed to handle message: size: %u, id: %u, type: %u", ctx->cport,
-		sys_le16_to_cpu(msg->size), sys_le16_to_cpu(msg->id), msg->type);
-
-close_conn:
-	LOG_DBG("closing fd %d", ctx->fd);
-	fd_context_erase(ctx->fd);
+	return msg;
 
 free_msg:
-	free(msg);
+	gb_message_dealloc(msg.msg);
+early_exit:
+	msg.cport = 0;
+	msg.msg = NULL;
+	return msg;
 }
 
-/* return the number of valid entries in the pollfds array */
-static int prepare_pollfds(struct pollfd *pollfds, size_t array_size)
-{
-	int r;
-	struct fd_context *cnode;
-	sys_dnode_t *node;
-	size_t fds;
-
-	memset(pollfds, 0, array_size * sizeof(*pollfds));
-
-	r = pthread_mutex_lock(&fd_list_mutex);
-	if (r != 0) {
-		LOG_ERR("failed to lock fd_list_mutex (%d)", r);
-		r = -r;
-		goto out;
-	}
-
-	fds = 0;
-	SYS_DLIST_FOR_EACH_NODE(&fd_list, node) {
-		++fds;
-	}
-
-	if (fds > array_size) {
-		LOG_ERR("Number of fds (%zu) exceeds number of pollfds available (%zu)", fds,
-			array_size);
-		r = -E2BIG;
-		goto unlock;
-	}
-
-	r = 0;
-	SYS_DLIST_FOR_EACH_CONTAINER(&fd_list, cnode, node) {
-		switch (cnode->type) {
-		case FD_CONTEXT_SERVER:
-		case FD_CONTEXT_CLIENT:
-		default:
-			pollfds[r].fd = cnode->fd;
-			pollfds[r].events = POLLIN;
-			r++;
-			break;
-		}
-	}
-
-	r = fds;
-
-unlock:
-	pthread_mutex_unlock(&fd_list_mutex);
-out:
-	return r;
-}
-
-static void *service_thread(void *arg)
-{
-	int r;
-	struct fd_context *ctx;
-	int pollfds_size;
-	static struct pollfd pollfds[CONFIG_NET_SOCKETS_POLL_MAX];
-
-	for (;;) {
-		pollfds_size = prepare_pollfds(pollfds, ARRAY_SIZE(pollfds));
-		if (pollfds_size <= 0) {
-			LOG_DBG("prepare_pollfds() returned %d", pollfds_size);
-			break;
-		}
-
-		r = poll(pollfds, pollfds_size, -1);
-		if (-1 == r) {
-			LOG_ERR("poll failed: %d", errno);
-			break;
-		}
-
-		for (size_t i = 0, revents = r; revents > 0 && i < pollfds_size; ++i) {
-			if (pollfds[i].revents & POLLIN) {
-				ctx = fd_to_context(pollfds[i].fd);
-
-				if (ctx == NULL) {
-					LOG_DBG("ctx is NULL");
-				} else {
-					switch (ctx->type) {
-					case FD_CONTEXT_SERVER:
-						accept_new_connection(ctx);
-						break;
-					case FD_CONTEXT_CLIENT:
-						handle_client_input(ctx);
-						break;
-					default:
-						LOG_ERR("ctx@%p has invalid type %u", ctx,
-							ctx->type);
-						break;
-					}
-				}
-
-				--revents;
-			}
-		}
-	}
-
-	LOG_WRN("Greybus is quitting");
-	fd_context_clear();
-
-	return NULL;
-}
-
-static int getMessage(int fd, struct gb_operation_hdr **msg)
-{
-	int r;
-	void *tmp;
-	size_t msg_size;
-	size_t payload_size;
-	size_t remaining;
-	size_t offset;
-	size_t recvd;
-
-	if (NULL == msg) {
-		LOG_DBG("One or more arguments were NULL or invalid");
-		return -EINVAL;
-	}
-
-	tmp = realloc(*msg, sizeof(**msg));
-	if (NULL == tmp) {
-		LOG_DBG("Failed to allocate memory");
-		return -ENOMEM;
-	}
-
-	*msg = tmp;
-
-	for (remaining = sizeof(**msg), offset = 0, recvd = 0; remaining;
-	     remaining -= recvd, offset += recvd, recvd = 0) {
-
-		r = recv(fd, &((uint8_t *)*msg)[offset], remaining, 0);
-		if (r == 0) {
-			/* Connection shut down gracefully */
-			return 0;
-		}
-
-		if (r == -1) {
-			return -errno;
-		}
-
-		recvd = r;
-	}
-
-	msg_size = sys_le16_to_cpu((*msg)->size);
-	if (msg_size < sizeof(struct gb_operation_hdr)) {
-		LOG_DBG("invalid message size %u", (unsigned)msg_size);
-		return -EINVAL;
-	}
-
-	payload_size = msg_size - sizeof(**msg);
-	if (payload_size > GB_MAX_PAYLOAD_SIZE) {
-		LOG_DBG("invalid payload size %u", (unsigned)payload_size);
-		return -EINVAL;
-	}
-
-	if (payload_size > 0) {
-		tmp = realloc(*msg, msg_size);
-		if (NULL == tmp) {
-			LOG_DBG("Failed to allocate memory");
-			return -ENOMEM;
-		}
-
-		*msg = tmp;
-
-		for (remaining = payload_size, offset = sizeof(**msg), recvd = 0; remaining;
-		     remaining -= recvd, offset += recvd, recvd = 0) {
-
-			r = recv(fd, &((uint8_t *)*msg)[offset], remaining, 0);
-			if (r == 0) {
-				/* Connection shut down gracefully */
-				return 0;
-			}
-
-			if (r < 0) {
-				return -errno;
-			}
-
-			recvd = r;
-		}
-	}
-
-	return msg_size;
-}
-
-static int sendMessage(int fd, struct gb_operation_hdr *msg)
-{
-	int r;
-	size_t offset;
-	size_t remaining;
-	size_t written;
-
-	for (remaining = sys_le16_to_cpu(msg->size), offset = 0, written = 0; remaining;
-	     remaining -= written, offset += written, written = 0) {
-
-		LOG_DBG("gb: send(%d, %p, %zu, 0)", fd, &((uint8_t *)msg)[offset], remaining);
-		r = send(fd, &((uint8_t *)msg)[offset], remaining, 0);
-
-		if (r < 0) {
-			LOG_ERR("send: %d", errno);
-			return -errno;
-		}
-
-		if (0 == r) {
-			LOG_ERR("send returned 0 - EOF?");
-			return -ENOTCONN;
-		}
-
-		written = r;
-	}
-
-	return 0;
-}
-
-static void gb_xport_init(void)
+static void gb_trans_init(void)
 {
 }
 
-static void gb_xport_exit(void)
+static void gb_trans_exit(void)
 {
 }
 
-static int gb_xport_listen_start(unsigned int cport)
+static int gb_trans_listen_start(unsigned int cport)
 {
 	return 0;
 }
 
-static int gb_xport_listen__stop(unsigned int cport)
+static int gb_trans_listen_stop(unsigned int cport)
 {
 	return 0;
 }
 
-static int gb_xport_send(unsigned int cport, const void *buf, size_t len)
+static void *gb_trans_alloc_buf(size_t size)
 {
-	int r;
+	void *p = k_heap_alloc(&gb_trans_heap, size, K_NO_WAIT);
+
+	if (!p) {
+		LOG_ERR("Failed to allocate %zu bytes", size);
+	}
+
+	return p;
+}
+
+static void gb_trans_free_buf(void *ptr)
+{
+	k_heap_free(&gb_trans_heap, ptr);
+}
+
+static int gb_trans_send(unsigned int cport, const void *buf, size_t len)
+{
+	int ret;
 	struct gb_operation_hdr *msg;
-	struct fd_context *ctx;
+	const __le16 cport_u16 = sys_cpu_to_le16(cport);
 
 	msg = (struct gb_operation_hdr *)buf;
+	// LOG_INF("Sending %u From cport %u %u", msg->id, cport_u16, cport);
 	if (NULL == msg) {
 		LOG_ERR("message is NULL");
 		return -EINVAL;
@@ -623,56 +223,30 @@ static int gb_xport_send(unsigned int cport, const void *buf, size_t len)
 		return -EINVAL;
 	}
 
-	ctx = fd_context_find(-1, cport, FD_CONTEXT_CLIENT);
-	if (ctx == NULL) {
-		LOG_ERR("failed to find client fd_context for cport %d", cport);
-		return -EINVAL;
+	ret = write_data(ctx.client_sock, &cport_u16, sizeof(cport_u16));
+	if (ret < 0) {
+		return ret;
 	}
 
-	r = sendMessage(ctx->fd, msg);
-	if (r != 0) {
-		fd_context_erase(ctx->fd);
-	}
-
-	return r;
+	ret = write_data(ctx.client_sock, buf, len);
+	return MIN(0, ret);
 }
 
-static void *gb_xport_alloc_buf(size_t size)
-{
-	void *p = malloc(size);
-
-	if (!p) {
-		LOG_ERR("Failed to allocate %zu bytes", size);
-	}
-
-	return p;
-}
-
-static void gb_xport_free__buf(void *ptr)
-{
-	free(ptr);
-}
-
-static const struct gb_transport_backend gb_xport = {
-	.init = gb_xport_init,
-	.exit = gb_xport_exit,
-	.listen = gb_xport_listen_start,
-	.stop_listening = gb_xport_listen__stop,
-	.send = gb_xport_send,
+static const struct gb_transport_backend gb_trans_backend = {
+	.init = gb_trans_init,
+	.exit = gb_trans_exit,
+	.listen = gb_trans_listen_start,
+	.stop_listening = gb_trans_listen_stop,
+	.alloc_buf = gb_trans_alloc_buf,
+	.free_buf = gb_trans_free_buf,
+	.send = gb_trans_send,
 	.send_async = NULL,
-	.alloc_buf = gb_xport_alloc_buf,
-	.free_buf = gb_xport_free__buf,
 };
 
-static int netsetup(size_t num_cports)
+static int netsetup()
 {
-	int r;
-	int fd;
-	size_t i;
+	int sock, ret, family, proto = IPPROTO_TCP;
 	const int yes = true;
-	int family;
-	uint16_t *port;
-	int proto = IPPROTO_TCP;
 	struct sockaddr sa;
 	socklen_t sa_len;
 
@@ -685,138 +259,195 @@ static int netsetup(size_t num_cports)
 		family = AF_INET6;
 		net_sin6(&sa)->sin6_family = AF_INET6;
 		net_sin6(&sa)->sin6_addr = in6addr_any;
-		port = &net_sin6(&sa)->sin6_port;
+		net_sin6(&sa)->sin6_port = htons(GB_TRANSPORT_TCPIP_BASE_PORT);
 		sa_len = sizeof(struct sockaddr_in6);
 	} else if (IS_ENABLED(CONFIG_NET_IPV4)) {
 		family = AF_INET;
 		net_sin(&sa)->sin_family = AF_INET;
 		net_sin(&sa)->sin_addr.s_addr = INADDR_ANY;
-		port = &net_sin(&sa)->sin_port;
+		net_sin(&sa)->sin_port = htons(GB_TRANSPORT_TCPIP_BASE_PORT);
 		sa_len = sizeof(struct sockaddr_in);
 	} else {
 		LOG_ERR("Neither IPv6 nor IPv4 is available");
 		return -EINVAL;
 	}
-	*port = htons(GB_TRANSPORT_TCPIP_BASE_PORT);
 
-	for (i = 0; i < num_cports; ++i) {
-		fd = socket(family, SOCK_STREAM, proto);
-		if (fd == -1) {
-			LOG_ERR("socket: %d", errno);
-			return -errno;
-		}
-
-		if (!fd_context_insert(fd, i, FD_CONTEXT_SERVER)) {
-			LOG_ERR("failed to add fd context for cport %zu", i);
-			close(fd);
-			return -EINVAL;
-		}
-
-		r = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
-		if (-1 == r) {
-			LOG_ERR("setsockopt: Failed to set SO_REUSEADDR (%d)", errno);
-			return -errno;
-		}
-
-		if (IS_ENABLED(CONFIG_GREYBUS_ENABLE_TLS)) {
-			static const sec_tag_t sec_tag_opt[] = {
-#if defined(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_OPTIONAL) ||                                          \
-	defined(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_REQUIRED)
-				GB_TLS_CA_CERT_TAG,
-#endif
-				GB_TLS_SERVER_CERT_TAG,
-			};
-
-			r = setsockopt(fd, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt,
-				       sizeof(sec_tag_opt));
-			if (-1 == r) {
-				LOG_ERR("setsockopt: Failed to set SEC_TAG_LIST (%d)", errno);
-				return -errno;
-			}
-
-			r = setsockopt(fd, SOL_TLS, TLS_HOSTNAME, CONFIG_GREYBUS_TLS_HOSTNAME,
-				       strlen(CONFIG_GREYBUS_TLS_HOSTNAME));
-			if (-1 == r) {
-				LOG_ERR("setsockopt: Failed to set TLS_HOSTNAME (%d)", errno);
-				return -errno;
-			}
-
-			/* default to no client verification */
-			int verify = TLS_PEER_VERIFY_NONE;
-
-			if (IS_ENABLED(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_OPTIONAL)) {
-				verify = TLS_PEER_VERIFY_OPTIONAL;
-			}
-
-			if (IS_ENABLED(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_REQUIRED)) {
-				verify = TLS_PEER_VERIFY_REQUIRED;
-			}
-
-			r = setsockopt(fd, SOL_TLS, TLS_PEER_VERIFY, &verify, sizeof(verify));
-			if (-1 == r) {
-				LOG_ERR("setsockopt: Failed to set TLS_PEER_VERIFY (%d)", errno);
-				return -errno;
-			}
-		}
-
-		*port = htons(GB_TRANSPORT_TCPIP_BASE_PORT + i);
-		r = bind(fd, &sa, sa_len);
-		if (-1 == r) {
-			LOG_ERR("bind: %d", errno);
-			return -errno;
-		}
-
-		r = listen(fd, GB_TRANSPORT_TCPIP_BACKLOG);
-		if (-1 == r) {
-			LOG_ERR("listen: %d", errno);
-			return -errno;
-		}
-
-		LOG_INF("CPort %zu mapped to " XPORT " port %zu", i,
-			GB_TRANSPORT_TCPIP_BASE_PORT + i);
+	sock = zsock_socket(family, SOCK_STREAM, proto);
+	if (sock < 0) {
+		LOG_ERR("socket: %d", errno);
+		return -errno;
 	}
 
-	return 0;
+	ret = zsock_setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+	if (ret < 0) {
+		LOG_ERR("setsockopt: Failed to set SO_REUSEADDR (%d)", errno);
+		return -errno;
+	}
+
+	if (IS_ENABLED(CONFIG_GREYBUS_ENABLE_TLS)) {
+		static const sec_tag_t sec_tag_opt[] = {
+#if defined(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_OPTIONAL) ||                                          \
+	defined(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_REQUIRED)
+			GB_TLS_CA_CERT_TAG,
+#endif
+			GB_TLS_SERVER_CERT_TAG,
+		};
+
+		ret = zsock_setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tag_opt,
+				       sizeof(sec_tag_opt));
+		if (ret < 0) {
+			LOG_ERR("setsockopt: Failed to set SEC_TAG_LIST (%d)", errno);
+			return -errno;
+		}
+
+		ret = zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, CONFIG_GREYBUS_TLS_HOSTNAME,
+				       strlen(CONFIG_GREYBUS_TLS_HOSTNAME));
+		if (ret < 0) {
+			LOG_ERR("setsockopt: Failed to set TLS_HOSTNAME (%d)", errno);
+			return -errno;
+		}
+
+		/* default to no client verification */
+		int verify = TLS_PEER_VERIFY_NONE;
+
+		if (IS_ENABLED(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_OPTIONAL)) {
+			verify = TLS_PEER_VERIFY_OPTIONAL;
+		}
+
+		if (IS_ENABLED(CONFIG_GREYBUS_TLS_CLIENT_VERIFY_REQUIRED)) {
+			verify = TLS_PEER_VERIFY_REQUIRED;
+		}
+
+		ret = zsock_setsockopt(sock, SOL_TLS, TLS_PEER_VERIFY, &verify, sizeof(verify));
+		if (ret < 0) {
+			LOG_ERR("setsockopt: Failed to set TLS_PEER_VERIFY (%d)", errno);
+			return -errno;
+		}
+	}
+
+	ret = zsock_bind(sock, &sa, sa_len);
+	if (ret < 0) {
+		LOG_ERR("bind: %d", errno);
+		return -errno;
+	}
+
+	ret = zsock_listen(sock, GB_TRANSPORT_TCPIP_BACKLOG);
+	if (ret < 0) {
+		LOG_ERR("listen: %d", errno);
+		return -errno;
+	}
+
+	LOG_INF("Greybus socket opened at port %zu", htons(GB_TRANSPORT_TCPIP_BASE_PORT));
+
+	return sock;
+}
+
+/*
+ * Helper to accept new connection
+ */
+static void gb_trans_accept(struct gb_trans_ctx *ctx)
+{
+	int ret;
+	struct zsock_pollfd fd = {
+		.fd = ctx->server_sock,
+		.events = ZSOCK_POLLIN,
+	};
+	struct sockaddr_in6 addr = {
+		.sin6_family = AF_INET6,
+		.sin6_addr = in6addr_any,
+	};
+	socklen_t addrlen = sizeof(addr);
+
+	ret = zsock_poll(&fd, 1, -1);
+	if (ret < 0) {
+		LOG_ERR("Socket poll failed");
+		return;
+	}
+
+	if (fd.revents & ZSOCK_POLLIN) {
+		ret = zsock_accept(fd.fd, (struct sockaddr *)&addr, &addrlen);
+		if (ret < 0) {
+			LOG_ERR("Failed to accept connection");
+			return;
+		}
+		ctx->client_sock = ret;
+	}
+
+	LOG_INF("Accepted new connection");
+}
+
+/*
+ * Helper to receive messages if socket connection is established
+ */
+static void gb_trans_rx(struct gb_trans_ctx *ctx)
+{
+	int ret;
+	bool flag = false;
+	struct gb_message_in_transport msg;
+	struct zsock_pollfd fd = {
+		.fd = ctx->client_sock,
+		.events = ZSOCK_POLLIN,
+	};
+
+	ret = zsock_poll(&fd, 1, -1);
+	if (ret < 0) {
+		LOG_ERR("Socket poll failed");
+		return;
+	}
+
+	if (fd.revents & ZSOCK_POLLIN) {
+		msg = gb_message_receive(fd.fd, &flag);
+		if (flag) {
+			zsock_close(fd.fd);
+			ctx->client_sock = -1;
+			return;
+		}
+
+		if (!msg.msg) {
+			LOG_ERR("Failed to receive message");
+			return;
+		}
+
+		ret = greybus_rx_handler(msg.cport, msg.msg, sys_le16_to_cpu(msg.msg->size));
+		gb_message_dealloc(msg.msg);
+
+		if (ret < 0) {
+			LOG_ERR("Failed to receive greybus message");
+		}
+	}
+}
+
+/*
+ * Hander function for rx thread
+ */
+static void gb_trans_rx_thread_handler(void *p1, void *p2, void *p3)
+{
+	while (true) {
+		if (ctx.client_sock == -1) {
+			gb_trans_accept(&ctx);
+		} else {
+			gb_trans_rx(&ctx);
+		}
+	}
 }
 
 struct gb_transport_backend *gb_transport_backend_init(size_t num_cports)
 {
-
-	int r;
-	struct gb_transport_backend *ret = NULL;
-
-	LOG_DBG("Greybus " XPORT " Transport initializing..");
-
-	pthread_mutex_init(&fd_list_mutex, NULL);
-	sys_dlist_init(&fd_list);
 	if (num_cports >= CPORT_ID_MAX) {
 		LOG_ERR("invalid number of cports %u", (unsigned)num_cports);
-		goto out;
+		return NULL;
 	}
 
-	r = netsetup(num_cports);
-	if (r < 0) {
-		LOG_ERR("netsetup() failed: %d", r);
-		goto cleanup;
+	ctx.server_sock = netsetup();
+	if (ctx.server_sock < 0) {
+		LOG_ERR("Failed to setup base TCP port");
+		return NULL;
 	}
+	ctx.client_sock = -1;
 
-	r = pthread_create(&accept_thread, NULL, service_thread, NULL);
-	if (r != 0) {
-		LOG_ERR("pthread_create: %d", r);
-		goto cleanup;
-	}
+	k_thread_create(&ctx.rx_thread, gb_trans_rx_stack, K_THREAD_STACK_SIZEOF(gb_trans_rx_stack),
+			gb_trans_rx_thread_handler, NULL, NULL, NULL, GB_TRANS_RX_STACK_PRIORITY, 0,
+			K_NO_WAIT);
 
-	pthread_setname_np(accept_thread, "greybus");
-
-	ret = (struct gb_transport_backend *)&gb_xport;
-
-	LOG_INF("Greybus " XPORT " Transport initialized");
-
-	goto out;
-
-cleanup:
-	fd_context_clear();
-
-out:
-	return ret;
+	return (struct gb_transport_backend *)&gb_trans_backend;
 }
