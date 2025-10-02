@@ -653,27 +653,45 @@ static void gb_lights_exit(unsigned int cport, struct gb_bundle *bundle)
 /**
  * @brief Greybus Lights Protocol operation handler
  */
-static struct gb_operation_handler gb_lights_handlers[] = {
-	GB_HANDLER(GB_LIGHTS_TYPE_PROTOCOL_VERSION, gb_lights_protocol_version),
-	GB_HANDLER(GB_LIGHTS_TYPE_GET_LIGHTS, gb_lights_get_lights),
-	GB_HANDLER(GB_LIGHTS_TYPE_GET_LIGHT_CONFIG, gb_lights_get_light_config),
-	GB_HANDLER(GB_LIGHTS_TYPE_GET_CHANNEL_CONFIG, gb_lights_get_channel_config),
-	GB_HANDLER(GB_LIGHTS_TYPE_GET_CHANNEL_FLASH_CONFIG, gb_lights_get_channel_flash_config),
-	GB_HANDLER(GB_LIGHTS_TYPE_SET_BRIGHTNESS, gb_lights_set_brightness),
-	GB_HANDLER(GB_LIGHTS_TYPE_SET_BLINK, gb_lights_set_blink),
-	GB_HANDLER(GB_LIGHTS_TYPE_SET_COLOR, gb_lights_set_color),
-	GB_HANDLER(GB_LIGHTS_TYPE_SET_FADE, gb_lights_set_fade),
-	GB_HANDLER(GB_LIGHTS_TYPE_SET_FLASH_INTENSITY, gb_lights_set_flash_intensity),
-	GB_HANDLER(GB_LIGHTS_TYPE_SET_FLASH_STROBE, gb_lights_set_flash_strobe),
-	GB_HANDLER(GB_LIGHTS_TYPE_SET_FLASH_TIMEOUT, gb_lights_set_flash_timeout),
-	GB_HANDLER(GB_LIGHTS_TYPE_GET_FLASH_FAULT, gb_lights_get_flash_fault),
-};
+static uint8_t gb_lights_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_LIGHTS_TYPE_PROTOCOL_VERSION:
+		return gb_lights_protocol_version(opr);
+	case GB_LIGHTS_TYPE_GET_LIGHTS:
+		return gb_lights_get_lights(opr);
+	case GB_LIGHTS_TYPE_GET_LIGHT_CONFIG:
+		return gb_lights_get_light_config(opr);
+	case GB_LIGHTS_TYPE_GET_CHANNEL_CONFIG:
+		return gb_lights_get_channel_config(opr);
+	case GB_LIGHTS_TYPE_GET_CHANNEL_FLASH_CONFIG:
+		return gb_lights_get_channel_flash_config(opr);
+	case GB_LIGHTS_TYPE_SET_BRIGHTNESS:
+		return gb_lights_set_brightness(opr);
+	case GB_LIGHTS_TYPE_SET_BLINK:
+		return gb_lights_set_blink(opr);
+	case GB_LIGHTS_TYPE_SET_COLOR:
+		return gb_lights_set_color(opr);
+	case GB_LIGHTS_TYPE_SET_FADE:
+		return gb_lights_set_fade(opr);
+	case GB_LIGHTS_TYPE_SET_FLASH_INTENSITY:
+		return gb_lights_set_flash_intensity(opr);
+	case GB_LIGHTS_TYPE_SET_FLASH_STROBE:
+		return gb_lights_set_flash_strobe(opr);
+	case GB_LIGHTS_TYPE_SET_FLASH_TIMEOUT:
+		return gb_lights_set_flash_timeout(opr);
+	case GB_LIGHTS_TYPE_GET_FLASH_FAULT:
+		return gb_lights_get_flash_fault(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_lights_driver = {
 	.init = gb_lights_init,
 	.exit = gb_lights_exit,
-	.op_handlers = gb_lights_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_lights_handlers),
+	.op_handler = gb_lights_handler,
 };
 
 /**

@@ -460,21 +460,27 @@ static void gb_spi_exit(unsigned int cport, struct gb_bundle *bundle)
 {
 }
 
-/**
- * @brief Greybus SPI protocol operation handler
- */
-static struct gb_operation_handler gb_spi_handlers[] = {
-	GB_HANDLER(GB_SPI_PROTOCOL_VERSION, gb_spi_protocol_version),
-	GB_HANDLER(GB_SPI_TYPE_MASTER_CONFIG, gb_spi_protocol_master_config),
-	GB_HANDLER(GB_SPI_TYPE_DEVICE_CONFIG, gb_spi_protocol_device_config),
-	GB_HANDLER(GB_SPI_PROTOCOL_TRANSFER, gb_spi_protocol_transfer),
-};
+static uint8_t gb_spi_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_SPI_PROTOCOL_VERSION:
+		return gb_spi_protocol_version(opr);
+	case GB_SPI_TYPE_MASTER_CONFIG:
+		return gb_spi_protocol_master_config(opr);
+	case GB_SPI_TYPE_DEVICE_CONFIG:
+		return gb_spi_protocol_device_config(opr);
+	case GB_SPI_PROTOCOL_TRANSFER:
+		return gb_spi_protocol_transfer(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_spi_driver = {
 	.init = gb_spi_init,
 	.exit = gb_spi_exit,
-	.op_handlers = gb_spi_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_spi_handlers),
+	.op_handler = gb_spi_handler,
 };
 
 /**

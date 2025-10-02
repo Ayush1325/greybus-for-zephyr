@@ -408,20 +408,31 @@ static void gb_power_supply_exit(unsigned int cport, struct gb_bundle *bundle)
 /**
  * @brief Greybus power supply protocol operation handler
  */
-static struct gb_operation_handler gb_power_supply_handlers[] = {
-	GB_HANDLER(GB_POWER_SUPPLY_TYPE_VERSION, gb_power_supply_version),
-	GB_HANDLER(GB_POWER_SUPPLY_TYPE_GET_SUPPLIES, gb_power_supply_get_supplies),
-	GB_HANDLER(GB_POWER_SUPPLY_TYPE_GET_DESCRIPTION, gb_power_supply_get_description),
-	GB_HANDLER(GB_POWER_SUPPLY_TYPE_GET_PROP_DESCRIPTORS, gb_power_supply_get_prop_descriptors),
-	GB_HANDLER(GB_POWER_SUPPLY_TYPE_GET_PROPERTY, gb_power_supply_get_property),
-	GB_HANDLER(GB_POWER_SUPPLY_TYPE_SET_PROPERTY, gb_power_supply_set_property),
-};
+static uint8_t gb_power_supply_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_POWER_SUPPLY_TYPE_VERSION:
+		return gb_power_supply_version(opr);
+	case GB_POWER_SUPPLY_TYPE_GET_SUPPLIES:
+		return gb_power_supply_get_supplies(opr);
+	case GB_POWER_SUPPLY_TYPE_GET_DESCRIPTION:
+		return gb_power_supply_get_description(opr);
+	case GB_POWER_SUPPLY_TYPE_GET_PROP_DESCRIPTORS:
+		return gb_power_supply_get_prop_descriptors(opr);
+	case GB_POWER_SUPPLY_TYPE_GET_PROPERTY:
+		return gb_power_supply_get_property(opr);
+	case GB_POWER_SUPPLY_TYPE_SET_PROPERTY:
+		return gb_power_supply_set_property(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_power_supply_driver = {
 	.init = gb_power_supply_init,
 	.exit = gb_power_supply_exit,
-	.op_handlers = gb_power_supply_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_power_supply_handlers),
+	.op_handler = gb_power_supply_handler,
 };
 
 /**

@@ -949,19 +949,29 @@ static void gb_uart_exit(unsigned int cport, struct gb_bundle *bundle)
 	free(info);
 }
 
-static struct gb_operation_handler gb_uart_handlers[] = {
-	GB_HANDLER(GB_UART_PROTOCOL_VERSION, gb_uart_protocol_version),
-	GB_HANDLER(GB_UART_PROTOCOL_SEND_DATA, gb_uart_send_data),
-	GB_HANDLER(GB_UART_PROTOCOL_SET_LINE_CODING, gb_uart_set_line_coding),
-	GB_HANDLER(GB_UART_PROTOCOL_SET_CONTROL_LINE_STATE, gb_uart_set_control_line_state),
-	GB_HANDLER(GB_UART_PROTOCOL_SEND_BREAK, gb_uart_send_break),
-};
+static uint8_t gb_uart_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_UART_PROTOCOL_VERSION:
+		return gb_uart_protocol_version(opr);
+	case GB_UART_PROTOCOL_SEND_DATA:
+		return gb_uart_send_data(opr);
+	case GB_UART_PROTOCOL_SET_LINE_CODING:
+		return gb_uart_set_line_coding(opr);
+	case GB_UART_PROTOCOL_SET_CONTROL_LINE_STATE:
+		return gb_uart_set_control_line_state(opr);
+	case GB_UART_PROTOCOL_SEND_BREAK:
+		return gb_uart_send_break(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 struct gb_driver uart_driver = {
 	.init = gb_uart_init,
 	.exit = gb_uart_exit,
-	.op_handlers = (struct gb_operation_handler *)gb_uart_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_uart_handlers),
+	.op_handler = gb_uart_handler,
 };
 
 /**

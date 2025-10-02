@@ -92,15 +92,23 @@ static uint8_t gb_vibrator_vibrator_off(struct gb_operation *operation)
 	return GB_OP_SUCCESS;
 }
 
-static struct gb_operation_handler gb_vibrator_handlers[] = {
-	GB_HANDLER(GB_VIBRATOR_TYPE_PROTOCOL_VERSION, gb_vibrator_protocol_version),
-	GB_HANDLER(GB_VIBRATOR_TYPE_VIBRATOR_ON, gb_vibrator_vibrator_on),
-	GB_HANDLER(GB_VIBRATOR_TYPE_VIBRATOR_OFF, gb_vibrator_vibrator_off),
-};
+static uint8_t gb_vibrator_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_VIBRATOR_TYPE_PROTOCOL_VERSION:
+		return gb_vibrator_protocol_version(opr);
+	case GB_VIBRATOR_TYPE_VIBRATOR_ON:
+		return gb_vibrator_vibrator_on(opr);
+	case GB_VIBRATOR_TYPE_VIBRATOR_OFF:
+		return gb_vibrator_vibrator_off(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 static struct gb_driver gb_vibrator_driver = {
-	.op_handlers = gb_vibrator_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_vibrator_handlers),
+	.op_handler = gb_vibrator_handler,
 };
 
 void gb_vibrator_register(int cport, int bundle)

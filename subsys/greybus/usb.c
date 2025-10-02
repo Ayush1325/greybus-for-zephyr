@@ -131,19 +131,27 @@ static void gb_usb_exit(unsigned int cport, struct gb_bundle *bundle)
 	}
 }
 
-static struct gb_operation_handler gb_usb_handlers[] = {
-	GB_HANDLER(GB_USB_TYPE_PROTOCOL_VERSION, gb_usb_protocol_version),
-	GB_HANDLER(GB_USB_TYPE_HCD_STOP, gb_usb_hcd_stop),
-	GB_HANDLER(GB_USB_TYPE_HCD_START, gb_usb_hcd_start),
-	GB_HANDLER(GB_USB_TYPE_HUB_CONTROL, gb_usb_hub_control),
-};
+static uint8_t gb_usb_handler(uint8_t type, struct gb_operation *opr)
+{
+	switch (type) {
+	case GB_USB_TYPE_PROTOCOL_VERSION:
+		return gb_usb_protocol_version(opr);
+	case GB_USB_TYPE_HCD_STOP:
+		return gb_usb_hcd_stop(opr);
+	case GB_USB_TYPE_HCD_START:
+		return gb_usb_hcd_start(opr);
+	case GB_USB_TYPE_HUB_CONTROL:
+		return gb_usb_hub_control(opr);
+	default:
+		LOG_ERR("Invalid type");
+		return GB_OP_INVALID;
+	}
+}
 
 struct gb_driver usb_driver = {
-	.op_handlers = (struct gb_operation_handler *)gb_usb_handlers,
-	.op_handlers_count = ARRAY_SIZE(gb_usb_handlers),
-
 	.init = gb_usb_init,
 	.exit = gb_usb_exit,
+	.op_handler = gb_usb_handler,
 };
 
 void gb_usb_register(int cport, int bundle)
