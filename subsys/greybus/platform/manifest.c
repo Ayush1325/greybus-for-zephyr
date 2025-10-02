@@ -18,15 +18,20 @@ static const unsigned char greybus_manifest_builtin[] = {
 
 #include "../greybus-manifest.h"
 
-int manifest_get(uint8_t **mnfb, size_t *mnfb_size)
+uint8_t *manifest_get(void)
 {
-	int r = -ENOENT;
-
 	if (IS_ENABLED(CONFIG_GREYBUS_MANIFEST_BUILTIN)) {
-		*mnfb = (uint8_t *)greybus_manifest_builtin;
-		*mnfb_size = sizeof(greybus_manifest_builtin);
-		r = 0;
+		return (uint8_t *)greybus_manifest_builtin;
 	}
 
-	return r;
+	return NULL;
+}
+
+size_t manifest_size(void)
+{
+	if (IS_ENABLED(CONFIG_GREYBUS_MANIFEST_BUILTIN)) {
+		return sizeof(greybus_manifest_builtin);
+	}
+
+	return 0;
 }
