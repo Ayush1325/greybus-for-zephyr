@@ -320,19 +320,6 @@ static int identify_descriptor(struct greybus_descriptor *desc, size_t size, int
 			}
 		}
 		break;
-	case GREYBUS_TYPE_PROPERTY:
-		expected_size += sizeof(struct greybus_descriptor_property);
-		expected_size += desc->property.length;
-		g_greybus.max_property_id = MAX(g_greybus.max_property_id, desc->property.id);
-		expected_size = ALIGN(expected_size);
-		break;
-	case GREYBUS_TYPE_DEVICE:
-		expected_size += sizeof(struct greybus_descriptor_device);
-		g_greybus.max_device_id = MAX(g_greybus.max_device_id, desc->device.id);
-		break;
-	case GREYBUS_TYPE_MIKROBUS:
-		expected_size += sizeof(struct greybus_descriptor_mikrobus);
-		break;
 	case GREYBUS_TYPE_INVALID:
 	default:
 		LOG_ERR("invalid descriptor type (%hhu)", desc_header->type);
@@ -392,24 +379,6 @@ static int identify_patch_descriptor(struct greybus_descriptor *desc, size_t siz
 	case GREYBUS_TYPE_CPORT:
 		expected_size += sizeof(struct greybus_descriptor_cport);
 		skip = 1;
-		break;
-	case GREYBUS_TYPE_PROPERTY:
-		expected_size += sizeof(struct greybus_descriptor_property);
-		expected_size += desc->property.length;
-		desc->property.id += g_greybus.max_property_id;
-		desc->property.propname_stringid += g_greybus.max_string_id;
-		g_greybus.max_patch_property_id =
-			MAX(g_greybus.max_patch_property_id, desc->property.id);
-		expected_size = ALIGN(expected_size);
-		break;
-	case GREYBUS_TYPE_DEVICE:
-		expected_size += sizeof(struct greybus_descriptor_device);
-		desc->device.id += g_greybus.max_device_id;
-		desc->device.driver_stringid += g_greybus.max_string_id;
-		g_greybus.max_patch_device_id = MAX(g_greybus.max_patch_device_id, desc->device.id);
-		break;
-	case GREYBUS_TYPE_MIKROBUS:
-		expected_size += sizeof(struct greybus_descriptor_mikrobus);
 		break;
 	case GREYBUS_TYPE_INVALID:
 	default:
@@ -504,7 +473,7 @@ bool manifest_parse(void *data, size_t size)
 /*
  * patch a buffer containing a interface manifest
  * with a manifest fragment, manifest fragment will have
- * mikrobus, device descriptor information.
+ * information.
  */
 bool manifest_patch(uint8_t **mnfb, void *data, size_t size)
 {

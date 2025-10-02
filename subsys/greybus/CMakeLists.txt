@@ -23,7 +23,7 @@ zephyr_library_sources(
 if(CONFIG_GREYBUS_MANIFEST_BUILTIN)
 
   devicetree_unfixed_h_to_mnfs(
-    ${PROJECT_BINARY_DIR}/include/generated/devicetree_generated.h
+    ${PROJECT_BINARY_DIR}/include/generated/zephyr/devicetree_generated.h
     ${PROJECT_BINARY_DIR}/include/generated/greybus.mnfs)
 
   mnfs_to_mnfb(${PROJECT_BINARY_DIR}/include/generated/greybus.mnfs
@@ -51,8 +51,6 @@ if(CONFIG_GREYBUS_TLS_BUILTIN)
     ${gen_dir}/greybus_tls_builtin_server_privkey.inc)
 endif()
 
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP_MULTIPLEX
-                             platform/transport-tcpip-multiplex.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP
                              platform/transport-tcpip.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART
@@ -72,5 +70,3 @@ zephyr_library_sources_ifdef(CONFIG_GREYBUS_SPI spi.c platform/spi.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_UART uart.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_USB usb.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_VIBRATOR vibrator.c)
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_CLICK_MANIFEST_CLICKID
-                             platform/mikrobus.c platform/w1-gpio.c)

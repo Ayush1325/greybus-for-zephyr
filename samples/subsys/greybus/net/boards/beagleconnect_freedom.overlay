@@ -16,20 +16,6 @@
 		compatible = "zephyr,greybus";
 		greybus;
 	};
-
-	mikrobus0: mikrobus0 {
-		id = <0>;
-		compatible = "zephyr,greybus-mikrobusid";
-		cs-gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-		rst-gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
-	};
-
-	mikrobus1: mikrobus1 {
-		id = <1>;
-		compatible = "zephyr,greybus-mikrobusid";
-		cs-gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
-		rst-gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-	};
 };
 
 &flash0 {
@@ -55,20 +41,6 @@
 		compatible = "zephyr,greybus-string";
 		id = <2>;
 		greybus-string = "Greybus Service Sample Application";
-	};
-
-	gbstring3: gbstring3 {
-			status = "okay";
-			compatible = "zephyr,greybus-string";
-			id = <3>;
-			greybus-string = "opt3001";
-	};
-
-	gbstring4: gbstring4 {
-			status = "okay";
-			compatible = "zephyr,greybus-string";
-			id = <4>;
-			greybus-string = "hdc2010";
 	};
 
 	gbinterface0 {
@@ -131,23 +103,4 @@
 		};
 
 	};
-
-	gbdevice0 {
-		status = "okay";
-		compatible = "zephyr,greybus-device";
-		id = <1>;
-		driver-string-id = <&gbstring3>;
-		protocol = <3>;
-		addr = <0x44>;
-	};
-
-	gbdevice1 {
-		status = "okay";
-		compatible = "zephyr,greybus-device";
-		id = <2>;
-		driver-string-id = <&gbstring4>;
-		protocol = <3>;
-		addr = <0x41>;
-	};
-	
 };

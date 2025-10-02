@@ -108,6 +108,8 @@ struct gb_bundle {
 };
 
 struct gb_operation {
+	void *fifo_reserved;   /* 1st word reserved for use by FIFO */
+
 	unsigned int cport;
 	bool has_responded;
 	atomic_t ref_count;
@@ -152,7 +154,6 @@ struct gb_driver {
 
 	struct gb_operation_handler *op_handlers;
 
-	size_t stack_size;
 	size_t op_handlers_count;
 	const char *name;
 

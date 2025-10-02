@@ -37,13 +37,10 @@ const struct gb_transport_backend *gb_transport_get_backend(void)
 	return xport;
 }
 
-static int greybus_service_init(const struct device *bus)
+static int greybus_service_init(void)
 {
 	int r;
 	uint8_t *mnfb;
-	uint8_t *combined_mnfb;
-	size_t mnfb_size;
-	unsigned int *cports = NULL;
 
 	if (xport != NULL) {
 		LOG_ERR("service already initialized");
@@ -53,83 +50,35 @@ static int greybus_service_init(const struct device *bus)
 	r = greybus_tls_init();
 	if (r < 0) {
 		LOG_ERR("gb_tls_init() failed: %d", r);
-		goto out;
+		return r;
 	}
-
 	LOG_DBG("Greybus initializing..");
 
-	bus = device_get_binding(GREYBUS_BUS_NAME);
-	if (NULL == bus) {
-		r = -ENODEV;
-		LOG_ERR("failed to get " GREYBUS_BUS_NAME " device");
-		r = -ENODEV;
-		goto out;
-	}
-
-	r = manifest_get(&mnfb, &mnfb_size);
-	if (r < 0) {
+	mnfb = manifest_get();
+	if (!mnfb) {
 		LOG_ERR("failed to get mnfb");
-		goto out;
+		return -ENOENT;
 	}
 
-	r = manifest_parse(mnfb, mnfb_size);
+	r = manifest_parse(mnfb, manifest_size());
 	if (r != true) {
 		LOG_ERR("failed to parse mnfb");
-		r = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
-	combined_mnfb = malloc(mnfb_size);
-	if (!combined_mnfb) {
-		return -ENOMEM;
-	}
-	memcpy(combined_mnfb, mnfb, mnfb_size);
-
-#if defined(CONFIG_GREYBUS_CLICK_MANIFEST_BUILTIN) || defined(CONFIG_GREYBUS_CLICK_MANIFEST_CLICKID)
-	uint8_t *mnfb_fragment;
-	size_t mnfb_fragment_size;
-
-	r = manifest_get_fragment(&mnfb_fragment, &mnfb_fragment_size, 0);
-	if (r < 0) {
-		LOG_ERR("failed to get mnfb fragment 0");
-		goto out;
-	}
-
-	r = manifest_patch(&combined_mnfb, mnfb_fragment, mnfb_fragment_size);
-	if (r != true) {
-		LOG_ERR("failed to patch mnfb");
-		r = -EINVAL;
-		goto out;
-	}
-	r = manifest_get_fragment(&mnfb_fragment, &mnfb_fragment_size, 1);
-	if (r < 0) {
-		LOG_ERR("failed to get mnfb fragment 1");
-		goto out;
-	}
-
-	r = manifest_patch(&combined_mnfb, mnfb_fragment, mnfb_fragment_size);
-	if (r != true) {
-		LOG_ERR("failed to patch mnfb");
-		r = -EINVAL;
-		goto out;
-	}
-#endif
-	extern size_t manifest_get_num_cports(void);
 	num_cports = manifest_get_num_cports();
 	if (num_cports == 0) {
 		LOG_ERR("no cports are defined");
-		r = -EINVAL;
-		goto out;
+		return -EINVAL;
 	}
 
 	xport = gb_transport_backend_init(num_cports);
 	if (xport == NULL) {
 		LOG_ERR("failed to get transport");
-		r = -EIO;
-		goto out;
+		return -EIO;
 	}
 
-	set_manifest_blob(combined_mnfb);
+	set_manifest_blob(mnfb);
 
 	r = gb_init((struct gb_transport_backend *)xport);
 	if (r < 0) {
@@ -138,21 +87,11 @@ static int greybus_service_init(const struct device *bus)
 	}
 
 	enable_cports();
-
 	LOG_INF("Greybus is active");
-
-	r = 0;
-	goto out;
+	return 0;
 
 clear_mnfb:
 	set_manifest_blob(NULL);
-	free(combined_mnfb);
-
-out:
-	if (cports != NULL) {
-		free(cports);
-	}
-
 	return r;
 }
 
