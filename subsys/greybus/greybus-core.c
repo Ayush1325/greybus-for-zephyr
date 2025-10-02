@@ -446,7 +446,6 @@ int greybus_rx_handler(unsigned int cport, void *data, size_t size)
 {
 	struct gb_operation *op;
 	struct gb_operation_hdr *hdr = data;
-	struct gb_operation_handler *op_handler;
 	size_t hdr_size;
 
 	gb_loopback_log_entry(cport);
@@ -482,13 +481,6 @@ int greybus_rx_handler(unsigned int cport, void *data, size_t size)
 
 		gb_tape->write(gb_tape_fd, &record_hdr, sizeof(record_hdr));
 		gb_tape->write(gb_tape_fd, data, size);
-	}
-
-	op_handler = find_operation_handler(hdr->type, cport);
-	if (op_handler && op_handler->fast_handler) {
-		LOG_DBG("%s", gb_handler_name(op_handler));
-		op_handler->fast_handler(cport, data);
-		return 0;
 	}
 
 	op = gb_rx_create_operation(cport, data, hdr_size);

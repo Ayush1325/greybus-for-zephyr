@@ -69,22 +69,15 @@ struct gb_operation;
 
 typedef void (*gb_operation_callback)(struct gb_operation *operation);
 typedef uint8_t (*gb_operation_handler_t)(struct gb_operation *operation);
-typedef void (*gb_operation_fast_handler_t)(unsigned int cport, void *data);
 
 #define GB_HANDLER(t, h)                                                                           \
 	{                                                                                          \
 		.type = t, .handler = h, .name = #h,                                               \
 	}
 
-#define GB_FAST_HANDLER(t, h)                                                                      \
-	{                                                                                          \
-		.type = t, .fast_handler = h, .name = #h,                                          \
-	}
-
 struct gb_operation_handler {
 	uint8_t type;
 	gb_operation_handler_t handler;
-	gb_operation_fast_handler_t fast_handler;
 	const char *name;
 };
 
