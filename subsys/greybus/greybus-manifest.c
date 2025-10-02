@@ -99,11 +99,7 @@ static struct greybus g_greybus = {
 	.max_patch_string_id = 0,
 };
 
-#ifdef CONFIG_GREYBUS_STATIC_MANIFEST
-static unsigned char *bridge_manifest = (unsigned char *)manifest_mnfb;
-#else
 static unsigned char *bridge_manifest;
-#endif
 
 static void *alloc_cport(void)
 {
