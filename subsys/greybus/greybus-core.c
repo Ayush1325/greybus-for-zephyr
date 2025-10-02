@@ -43,16 +43,12 @@
 #include <zephyr/sys/byteorder.h>
 #if defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) || defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) ||        \
 	defined(CONFIG_BOARD_NRF52_BSIM)
-#include <pthread.h>
 #include <semaphore.h>
-/* For some reason, not declared even with _GNU_SOURCE */
-extern int pthread_setname_np(pthread_t thread, const char *name);
 
 #define DEFAULT_STACK_SIZE PTHREAD_STACK_MIN
 
 #else
 
-#include <zephyr/posix/pthread.h>
 #include <zephyr/posix/semaphore.h>
 
 #endif
@@ -102,9 +98,6 @@ struct wdog_s {
 struct gb_cport_driver {
 	struct gb_driver *driver;
 	sys_dlist_t tx_fifo;
-	sys_dlist_t rx_fifo;
-	sem_t rx_fifo_lock;
-	pthread_t thread;
 	volatile bool exit_worker;
 	struct wdog_s timeout_wd;
 	struct gb_operation timedout_operation;
@@ -132,6 +125,12 @@ static struct gb_operation_hdr oom_hdr = {
 	.result = GB_OP_NO_MEMORY,
 	.type = GB_TYPE_RESPONSE_FLAG,
 };
+
+K_FIFO_DEFINE(gb_rx_fifo);
+
+K_THREAD_STACK_DEFINE(gb_rx_thread_stack, 1536);
+static struct k_thread gb_rx_thread;
+static k_tid_t gb_rx_threadid;
 
 static void gb_operation_timeout(int argc, uint32_t cport, ...);
 static struct gb_operation *_gb_operation_create(unsigned int cport);
@@ -375,46 +374,39 @@ static void gb_process_response(struct gb_operation_hdr *hdr, struct gb_operatio
 		operation->cport, sys_le16_to_cpu(hdr->id));
 }
 
-static void *gb_pending_message_worker(void *data)
+static void gb_pending_message_worker(void *p1, void *p2, void *p3)
 {
-	const int cportid = (intptr_t)data;
-	int flags;
-	struct gb_operation *operation;
-	sys_dnode_t *head;
+	ARG_UNUSED(p1);
+	ARG_UNUSED(p2);
+	ARG_UNUSED(p3);
+
+	struct gb_operation *opr;
 	struct gb_operation_hdr *hdr;
-	int retval;
 
 	while (1) {
-		retval = sem_wait(&g_cport[cportid].rx_fifo_lock);
-		if (retval < 0) {
+		opr = k_fifo_get(&gb_rx_fifo, K_FOREVER);
+
+		if (g_cport[opr->cport].exit_worker) {
+			gb_operation_destroy(opr);
 			continue;
 		}
 
-		if (g_cport[cportid].exit_worker && sys_dlist_is_empty(&g_cport[cportid].rx_fifo)) {
-			break;
-		}
-
-		flags = irq_lock();
-		head = sys_dlist_get(&g_cport[cportid].rx_fifo);
-		irq_unlock(flags);
-
-		operation = SYS_DLIST_CONTAINER(head, operation, node);
-		hdr = operation->request_buffer;
+		hdr = opr->request_buffer;
 
 		if (hdr == &timedout_hdr) {
-			gb_clean_timedout_operation(cportid);
+			gb_clean_timedout_operation(opr->cport);
+			gb_operation_destroy(opr);
 			continue;
 		}
 
 		if (hdr->type & GB_TYPE_RESPONSE_FLAG) {
-			gb_process_response(hdr, operation);
+			gb_process_response(hdr, opr);
 		} else {
-			gb_process_request(hdr, operation);
+			gb_process_request(hdr, opr);
 		}
-		gb_operation_destroy(operation);
-	}
 
-	return NULL;
+		gb_operation_destroy(opr);
+	}
 }
 
 #if defined(CONFIG_UNIPRO_ZERO_COPY)
@@ -450,7 +442,6 @@ static struct gb_operation *gb_rx_create_operation(unsigned cport, void *data, s
 
 int greybus_rx_handler(unsigned int cport, void *data, size_t size)
 {
-	int flags;
 	struct gb_operation *op;
 	struct gb_operation_hdr *hdr = data;
 	struct gb_operation_handler *op_handler;
@@ -505,10 +496,7 @@ int greybus_rx_handler(unsigned int cport, void *data, size_t size)
 
 	op_mark_recv_time(op);
 
-	flags = irq_lock();
-	sys_dlist_append(&g_cport[cport].rx_fifo, &op->node);
-	sem_post(&g_cport[cport].rx_fifo_lock);
-	irq_unlock(flags);
+	k_fifo_put(&gb_rx_fifo, op);
 
 	return 0;
 }
@@ -536,8 +524,6 @@ int gb_unregister_driver(unsigned int cport)
 	wd_cancel(&g_cport[cport].timeout_wd);
 
 	g_cport[cport].exit_worker = true;
-	sem_post(&g_cport[cport].rx_fifo_lock);
-	pthread_join(g_cport[cport].thread, NULL);
 
 	gb_flush_tx_fifo(cport);
 
@@ -625,26 +611,11 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 
 	g_cport[cport].exit_worker = false;
 
-	retval = pthread_create(&g_cport[cport].thread, NULL, gb_pending_message_worker,
-				(void *)((intptr_t)cport));
-	if (retval) {
-		LOG_ERR("pthread_create() failed (%d)", retval);
-		goto pthread_create_error;
-	}
-
 	snprintf(thread_name, sizeof(thread_name), "greybus[%u]", cport);
-	pthread_setname_np(g_cport[cport].thread, thread_name);
 
 	g_cport[cport].driver = driver;
 
 	return 0;
-
-pthread_create_error:
-	LOG_ERR("Can not create thread for %s", gb_driver_name(driver));
-	if (driver->exit) {
-		driver->exit(cport, bundle);
-	}
-	return retval;
 }
 
 int gb_listen(unsigned int cport)
@@ -695,8 +666,7 @@ static void gb_operation_timeout(int argc, uint32_t cport, ...)
 		return;
 	}
 
-	sys_dlist_append(&g_cport[cport].rx_fifo, &g_cport[cport].timedout_operation.node);
-	sem_post(&g_cport[cport].rx_fifo_lock);
+	k_fifo_put(&gb_rx_fifo, &g_cport[cport].timedout_operation);
 	irq_unlock(flags);
 }
 
@@ -1075,9 +1045,11 @@ int gb_init(struct gb_transport_backend *transport)
 		return -ENOMEM;
 	}
 
+	gb_rx_threadid = k_thread_create(
+		&gb_rx_thread, gb_rx_thread_stack, K_THREAD_STACK_SIZEOF(gb_rx_thread_stack),
+		gb_pending_message_worker, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
+
 	for (i = 0; i < cport_count; i++) {
-		sem_init(&g_cport[i].rx_fifo_lock, 0, 0);
-		sys_dlist_init(&g_cport[i].rx_fifo);
 		sys_dlist_init(&g_cport[i].tx_fifo);
 		wd_static(&g_cport[i].timeout_wd);
 		g_cport[i].timedout_operation.request_buffer = &timedout_hdr;
@@ -1104,8 +1076,9 @@ void gb_deinit(void)
 		gb_unregister_driver(i);
 
 		wd_delete(&g_cport[i].timeout_wd);
-		sem_destroy(&g_cport[i].rx_fifo_lock);
 	}
+
+	k_thread_abort(gb_rx_threadid);
 
 	free(g_cport);
 
