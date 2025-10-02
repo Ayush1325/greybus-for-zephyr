@@ -28,7 +28,6 @@
 
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
-#include <errno.h>
 #include <greybus/greybus.h>
 #include <greybus/platform.h>
 #include <stdlib.h>
