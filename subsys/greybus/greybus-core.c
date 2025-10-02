@@ -128,6 +128,8 @@ static struct gb_operation_hdr oom_hdr = {
 
 K_FIFO_DEFINE(gb_rx_fifo);
 
+K_MEM_SLAB_DEFINE_STATIC(gb_operation_slab, sizeof(struct gb_operation), 10, 4);
+
 K_THREAD_STACK_DEFINE(gb_rx_thread_stack, 1536);
 static struct k_thread gb_rx_thread;
 static k_tid_t gb_rx_threadid;
@@ -924,19 +926,20 @@ void gb_operation_unref(struct gb_operation *operation)
 	if (operation->response) {
 		gb_operation_unref(operation->response);
 	}
-	free(operation);
+	k_mem_slab_free(&gb_operation_slab, operation);
 }
 
 static struct gb_operation *_gb_operation_create(unsigned int cport)
 {
+	int ret;
 	struct gb_operation *operation;
 
 	if (cport >= cport_count) {
 		return NULL;
 	}
 
-	operation = malloc(sizeof(*operation));
-	if (!operation) {
+	ret = k_mem_slab_alloc(&gb_operation_slab, (void **)&operation, K_FOREVER);
+	if (ret < 0) {
 		return NULL;
 	}
 
@@ -975,7 +978,7 @@ struct gb_operation *gb_operation_create(unsigned int cport, uint8_t type, uint3
 
 	return operation;
 malloc_error:
-	free(operation);
+	k_mem_slab_free(&gb_operation_slab, operation);
 	return NULL;
 }
 
