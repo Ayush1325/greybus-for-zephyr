@@ -37,7 +37,7 @@ const struct gb_transport_backend *gb_transport_get_backend(void)
 	return xport;
 }
 
-static int greybus_service_init(const struct device *bus)
+static int greybus_service_init(void)
 {
 	int r;
 	uint8_t *mnfb;
@@ -57,14 +57,6 @@ static int greybus_service_init(const struct device *bus)
 	}
 
 	LOG_DBG("Greybus initializing..");
-
-	bus = device_get_binding(GREYBUS_BUS_NAME);
-	if (NULL == bus) {
-		r = -ENODEV;
-		LOG_ERR("failed to get " GREYBUS_BUS_NAME " device");
-		r = -ENODEV;
-		goto out;
-	}
 
 	r = manifest_get(&mnfb, &mnfb_size);
 	if (r < 0) {
