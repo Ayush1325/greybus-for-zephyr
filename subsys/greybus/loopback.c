@@ -321,27 +321,32 @@ int gb_loopback_send_req(int cport, size_t size, uint8_t type)
 
 	switch (type) {
 	case GB_LOOPBACK_TYPE_PING:
-		status = gb_operation_send_request(operation, gb_loopback_ping_sink_resp_cb, true);
+		status = gb_operation_send_request(operation, true);
 		break;
 	case GB_LOOPBACK_TYPE_TRANSFER:
+		request = gb_operation_get_request_payload(operation);
+		request->len = sys_cpu_to_le32(size);
+		for (i = 0; i < size; i++) {
+			request->data[i] = rand() & 0xFF;
+		}
+		status = gb_operation_send_request(operation, true);
+		break;
 	case GB_LOOPBACK_TYPE_SINK:
 		request = gb_operation_get_request_payload(operation);
 		request->len = sys_cpu_to_le32(size);
-		if (type == GB_LOOPBACK_TYPE_TRANSFER) {
-			for (i = 0; i < size; i++) {
-				request->data[i] = rand() & 0xFF;
-			}
-			status = gb_operation_send_request(operation, gb_loopback_transfer_resp_cb,
-							   true);
-		} else {
-			/*
-			 * Data payload is ignored on receiver end.
-			 * No need to fill the buffer with some data.
-			 */
-			status = gb_operation_send_request(operation, gb_loopback_ping_sink_resp_cb,
-							   true);
-		}
+		/*
+		 * Data payload is ignored on receiver end.
+		 * No need to fill the buffer with some data.
+		 */
+		status = gb_operation_send_request(operation, true);
 		break;
+	case GB_RESPONSE(GB_LOOPBACK_TYPE_TRANSFER):
+		gb_loopback_transfer_resp_cb(operation);
+		return 0;
+	case GB_RESPONSE(GB_LOOPBACK_TYPE_SINK):
+	case GB_RESPONSE(GB_LOOPBACK_TYPE_PING):
+		gb_loopback_ping_sink_resp_cb(operation);
+		return 0;
 	default:
 		retval = -EINVAL;
 		break;

@@ -395,7 +395,7 @@ static void *uart_status_thread(void *data)
 			info->last_serial_state = updated_status;
 			request = gb_operation_get_request_payload(info->ms_ls_operation);
 			request->control = updated_status;
-			ret = gb_operation_send_request(info->ms_ls_operation, NULL, false);
+			ret = gb_operation_send_request(info->ms_ls_operation, false);
 			if (ret) {
 				uart_report_error(GB_UART_EVENT_PROTOCOL_ERROR, __func__);
 			}
@@ -445,7 +445,7 @@ static void *uart_rx_thread(void *data)
 				request->flags = node->data_flags;
 				memcpy(request->data, node->buffer, node->data_size);
 
-				ret = gb_operation_send_request(operation, NULL, false);
+				ret = gb_operation_send_request(operation, false);
 				if (ret) {
 					uart_report_error(GB_UART_EVENT_PROTOCOL_ERROR, __func__);
 				}

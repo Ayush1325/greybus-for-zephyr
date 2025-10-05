@@ -288,9 +288,6 @@ static void gb_clean_timedout_operation(unsigned int cport)
 		sys_dlist_remove(&op->node);
 		irq_unlock(flags);
 
-		if (op->callback) {
-			op->callback(op);
-		}
 		gb_operation_unref(op);
 	}
 
@@ -319,9 +316,6 @@ static void gb_process_response(struct gb_operation_hdr *hdr, struct gb_operatio
 		gb_operation_ref(operation);
 		op->response = operation;
 		op_mark_recv_time(op);
-		if (op->callback) {
-			op->callback(op);
-		}
 		gb_operation_unref(op);
 		return;
 	}
@@ -620,17 +614,12 @@ static int gb_operation_send_request_nowait_cb(int status, const void *buf, void
 
 	hdr->result = status ? GB_OP_INTERNAL : 0;
 
-	if (operation->callback) {
-		operation->callback(operation);
-	}
-
 	gb_operation_unref(operation);
 
 	return 0;
 }
 
-int gb_operation_send_request_nowait(struct gb_operation *operation, gb_operation_callback callback,
-				     bool need_response)
+int gb_operation_send_request_nowait(struct gb_operation *operation, bool need_response)
 {
 	struct gb_operation_hdr *hdr = operation->request_buffer;
 	int retval = 0;
@@ -649,7 +638,6 @@ int gb_operation_send_request_nowait(struct gb_operation *operation, gb_operatio
 	}
 
 	hdr->id = 0;
-	operation->callback = callback;
 
 	// LOG_HEXDUMP_DBG(operation->request_buffer, hdr->size, "TX: ");
 
@@ -665,8 +653,7 @@ int gb_operation_send_request_nowait(struct gb_operation *operation, gb_operatio
 	return retval;
 }
 
-int gb_operation_send_request(struct gb_operation *operation, gb_operation_callback callback,
-			      bool need_response)
+int gb_operation_send_request(struct gb_operation *operation, bool need_response)
 {
 	struct gb_operation_hdr *hdr = operation->request_buffer;
 	int retval = 0;
@@ -690,7 +677,6 @@ int gb_operation_send_request(struct gb_operation *operation, gb_operation_callb
 			hdr->id = sys_cpu_to_le16(atomic_inc(&request_id));
 		}
 		clock_gettime(CLOCK_MONOTONIC, &operation->time);
-		operation->callback = callback;
 		gb_operation_ref(operation);
 		sys_dlist_append(&g_cport[operation->cport].tx_fifo, &operation->node);
 		if (!WDOG_ISACTIVE(&g_cport[operation->cport].timeout_wd)) {
@@ -710,29 +696,6 @@ int gb_operation_send_request(struct gb_operation *operation, gb_operation_callb
 	}
 
 	irq_unlock(flags);
-
-	return retval;
-}
-
-static void gb_operation_callback_sync(struct gb_operation *operation)
-{
-	sem_post(&operation->sync_sem);
-}
-
-int gb_operation_send_request_sync(struct gb_operation *operation)
-{
-	int retval;
-
-	sem_init(&operation->sync_sem, 0, 0);
-
-	retval = gb_operation_send_request(operation, gb_operation_callback_sync, true);
-	if (retval) {
-		return retval;
-	}
-
-	do {
-		retval = sem_wait(&operation->sync_sem);
-	} while (retval < 0 && errno == EINTR);
 
 	return retval;
 }
