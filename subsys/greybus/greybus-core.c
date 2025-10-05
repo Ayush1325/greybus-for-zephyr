@@ -97,7 +97,6 @@ struct wdog_s {
 };
 struct gb_cport_driver {
 	struct gb_driver *driver;
-	sys_dlist_t tx_fifo;
 	volatile bool exit_worker;
 	struct wdog_s timeout_wd;
 	struct gb_operation timedout_operation;
@@ -227,101 +226,12 @@ static void gb_process_request(struct gb_operation_hdr *hdr, struct gb_operation
 	op_mark_send_time(operation);
 }
 
-static bool gb_operation_has_timedout(struct gb_operation *operation)
-{
-	struct timespec current_time;
-	struct timespec timeout_time;
-
-	timeout_time.tv_sec = operation->time.tv_sec + TIMEOUT_IN_MS / ONE_SEC_IN_MSEC;
-	timeout_time.tv_nsec =
-		operation->time.tv_nsec + (TIMEOUT_IN_MS % ONE_SEC_IN_MSEC) * ONE_MSEC_IN_NSEC;
-	clock_gettime(CLOCK_MONOTONIC, &current_time);
-
-	if (current_time.tv_sec > timeout_time.tv_sec) {
-		return true;
-	}
-
-	if (current_time.tv_sec < timeout_time.tv_sec) {
-		return false;
-	}
-
-	return current_time.tv_nsec > timeout_time.tv_nsec;
-}
-
-/**
- * Update watchdog state
- *
- * Cancel cport watchdog if there is no outgoing message waiting for a response,
- * or update the watchdog if there is still outgoing messages.
- *
- * TODO use fine-grain timeout delay when doing the update
- *
- * @note This function should be called from an atomic context
- */
-static void gb_watchdog_update(unsigned int cport)
-{
-	int flags;
-
-	flags = irq_lock();
-
-	if (sys_dlist_is_empty(&g_cport[cport].tx_fifo)) {
-		wd_cancel(&g_cport[cport].timeout_wd);
-	} else {
-		wd_start(&g_cport[cport].timeout_wd, TIMEOUT_WD_DELAY, gb_operation_timeout, 1,
-			 cport);
-	}
-
-	irq_unlock(flags);
-}
-
-static void gb_clean_timedout_operation(unsigned int cport)
-{
-	int flags;
-	struct gb_operation *op, *op_safe;
-
-	SYS_DLIST_FOR_EACH_CONTAINER_SAFE(&g_cport[cport].tx_fifo, op, op_safe, node) {
-		if (!gb_operation_has_timedout(op)) {
-			continue;
-		}
-
-		flags = irq_lock();
-		sys_dlist_remove(&op->node);
-		irq_unlock(flags);
-
-		gb_operation_unref(op);
-	}
-
-	gb_watchdog_update(cport);
-}
-
 static void gb_process_response(struct gb_operation_hdr *hdr, struct gb_operation *operation)
 {
-	int flags;
-	struct gb_operation *op, *op_safe;
-	struct gb_operation_hdr *op_hdr;
+	operation->bundle = g_cport[operation->cport].driver->bundle;
+	g_cport[operation->cport].driver->op_handler(hdr->type, operation);
 
-	SYS_DLIST_FOR_EACH_CONTAINER_SAFE(&g_cport[operation->cport].tx_fifo, op, op_safe, node) {
-		op_hdr = op->request_buffer;
-
-		if (hdr->id != op_hdr->id) {
-			continue;
-		}
-
-		flags = irq_lock();
-		sys_dlist_remove(&op->node);
-		gb_watchdog_update(operation->cport);
-		irq_unlock(flags);
-
-		/* attach this response with the original request */
-		gb_operation_ref(operation);
-		op->response = operation;
-		op_mark_recv_time(op);
-		gb_operation_unref(op);
-		return;
-	}
-
-	LOG_ERR("CPort %u: cannot find matching request for response %hu. Dropping message.",
-		operation->cport, sys_le16_to_cpu(hdr->id));
+	gb_operation_unref(operation);
 }
 
 static void gb_pending_message_worker(void *p1, void *p2, void *p3)
@@ -344,7 +254,6 @@ static void gb_pending_message_worker(void *p1, void *p2, void *p3)
 		hdr = opr->request_buffer;
 
 		if (hdr == &timedout_hdr) {
-			gb_clean_timedout_operation(opr->cport);
 			gb_operation_destroy(opr);
 			continue;
 		}
@@ -443,16 +352,6 @@ int greybus_rx_handler(unsigned int cport, void *data, size_t size)
 	return 0;
 }
 
-static void gb_flush_tx_fifo(unsigned int cport)
-{
-	struct gb_operation *op, *op_safe;
-
-	SYS_DLIST_FOR_EACH_CONTAINER_SAFE(&g_cport[cport].tx_fifo, op, op_safe, node) {
-		sys_dlist_remove(&op->node);
-		gb_operation_unref(op);
-	}
-}
-
 int gb_unregister_driver(unsigned int cport)
 {
 	if (cport >= cport_count || !g_cport[cport].driver || !transport_backend) {
@@ -466,8 +365,6 @@ int gb_unregister_driver(unsigned int cport)
 	wd_cancel(&g_cport[cport].timeout_wd);
 
 	g_cport[cport].exit_worker = true;
-
-	gb_flush_tx_fifo(cport);
 
 	if (g_cport[cport].driver->exit) {
 		g_cport[cport].driver->exit(cport, g_cport[cport].driver->bundle);
@@ -677,8 +574,6 @@ int gb_operation_send_request(struct gb_operation *operation, bool need_response
 			hdr->id = sys_cpu_to_le16(atomic_inc(&request_id));
 		}
 		clock_gettime(CLOCK_MONOTONIC, &operation->time);
-		gb_operation_ref(operation);
-		sys_dlist_append(&g_cport[operation->cport].tx_fifo, &operation->node);
 		if (!WDOG_ISACTIVE(&g_cport[operation->cport].timeout_wd)) {
 			wd_start(&g_cport[operation->cport].timeout_wd, TIMEOUT_WD_DELAY,
 				 gb_operation_timeout, 1, operation->cport);
@@ -691,7 +586,6 @@ int gb_operation_send_request(struct gb_operation *operation, bool need_response
 	op_mark_send_time(operation);
 	if (need_response && retval) {
 		sys_dlist_remove(&operation->node);
-		gb_watchdog_update(operation->cport);
 		gb_operation_unref(operation);
 	}
 
@@ -752,7 +646,6 @@ int gb_operation_send_response(struct gb_operation *operation, uint8_t result)
 	resp_hdr = operation->response_buffer;
 	resp_hdr->result = result;
 
-	// LOG_HEXDUMP_DBG(operation->response_buffer, resp_hdr->size, "TX: ");
 	gb_loopback_log_exit(operation->cport, operation, resp_hdr->size);
 	retval = transport_backend->send(operation->cport, operation->response_buffer,
 					 sys_le16_to_cpu(resp_hdr->size));
@@ -957,7 +850,6 @@ int gb_init(struct gb_transport_backend *transport)
 		gb_pending_message_worker, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
 
 	for (i = 0; i < cport_count; i++) {
-		sys_dlist_init(&g_cport[i].tx_fifo);
 		wd_static(&g_cport[i].timeout_wd);
 		g_cport[i].timedout_operation.request_buffer = &timedout_hdr;
 		sys_dnode_init(&g_cport[i].timedout_operation.node);
