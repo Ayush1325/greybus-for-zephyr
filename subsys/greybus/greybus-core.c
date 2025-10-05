@@ -133,7 +133,6 @@ K_THREAD_STACK_DEFINE(gb_rx_thread_stack, 1536);
 static struct k_thread gb_rx_thread;
 static k_tid_t gb_rx_threadid;
 
-static void gb_operation_timeout(int argc, uint32_t cport, ...);
 static struct gb_operation *_gb_operation_create(unsigned int cport);
 
 uint8_t gb_errno_to_op_result(int err)
@@ -488,22 +487,6 @@ int gb_stop_listening(unsigned int cport)
 	return transport_backend->stop_listening(cport);
 }
 
-static void gb_operation_timeout(int argc, uint32_t cport, ...)
-{
-	int flags;
-
-	flags = irq_lock();
-
-	/* timedout operation could potentially already been queued */
-	if (!sys_dnode_is_linked(&g_cport[cport].timedout_operation.node)) {
-		irq_unlock(flags);
-		return;
-	}
-
-	k_fifo_put(&gb_rx_fifo, &g_cport[cport].timedout_operation);
-	irq_unlock(flags);
-}
-
 static int gb_operation_send_request_nowait_cb(int status, const void *buf, void *priv)
 {
 	struct gb_operation *operation = priv;
@@ -574,10 +557,6 @@ int gb_operation_send_request(struct gb_operation *operation, bool need_response
 			hdr->id = sys_cpu_to_le16(atomic_inc(&request_id));
 		}
 		clock_gettime(CLOCK_MONOTONIC, &operation->time);
-		if (!WDOG_ISACTIVE(&g_cport[operation->cport].timeout_wd)) {
-			wd_start(&g_cport[operation->cport].timeout_wd, TIMEOUT_WD_DELAY,
-				 gb_operation_timeout, 1, operation->cport);
-		}
 	}
 
 	// LOG_HEXDUMP_DBG(operation->request_buffer, hdr->size, "TX: ");
@@ -585,7 +564,6 @@ int gb_operation_send_request(struct gb_operation *operation, bool need_response
 					 sys_le16_to_cpu(hdr->size));
 	op_mark_send_time(operation);
 	if (need_response && retval) {
-		sys_dlist_remove(&operation->node);
 		gb_operation_unref(operation);
 	}
 
@@ -743,7 +721,6 @@ static struct gb_operation *_gb_operation_create(unsigned int cport)
 	memset(operation, 0, sizeof(*operation));
 	operation->cport = cport;
 
-	sys_dnode_init(&operation->node);
 	atomic_init(&operation->ref_count, 1);
 
 	return operation;
@@ -852,7 +829,6 @@ int gb_init(struct gb_transport_backend *transport)
 	for (i = 0; i < cport_count; i++) {
 		wd_static(&g_cport[i].timeout_wd);
 		g_cport[i].timedout_operation.request_buffer = &timedout_hdr;
-		sys_dnode_init(&g_cport[i].timedout_operation.node);
 	}
 
 	atomic_init(&request_id, (uint32_t)0);

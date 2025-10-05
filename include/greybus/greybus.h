@@ -104,7 +104,6 @@ struct gb_operation {
 	sem_t sync_sem;
 
 	void *priv_data;
-	sys_dnode_t node;
 
 	struct gb_operation *response;
 
