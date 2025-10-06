@@ -6,6 +6,7 @@
 
 #include "certificate.h"
 #include "transport.h"
+#include "../greybus_messages.h"
 
 LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 
@@ -19,7 +20,6 @@ LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 /* Based on UniPro, from Linux */
 #define CPORT_ID_MAX 4095
 
-#define GB_TRANS_HEAP_SIZE         2048
 #define GB_TRANS_RX_STACK_SIZE     2048
 #define GB_TRANS_RX_STACK_PRIORITY 6
 
@@ -31,19 +31,7 @@ DNS_SD_REGISTER_TCP_SERVICE(gb_service_advertisement, CONFIG_NET_HOSTNAME, "_gre
 			    DNS_SD_EMPTY_TXT, GB_TRANSPORT_TCPIP_BASE_PORT);
 #endif /* CONFIG_GREYBUS_ENABLE_TLS */
 
-K_HEAP_DEFINE(gb_trans_heap, GB_TRANS_HEAP_SIZE);
 K_THREAD_STACK_DEFINE(gb_trans_rx_stack, GB_TRANS_RX_STACK_SIZE);
-
-/*
- * struct gb_message_in_transport: The format of message over socket
- *
- * @cport: The cport on the node
- * @msg: Pointer to start of message
- */
-struct gb_message_in_transport {
-	uint16_t cport;
-	struct gb_operation_hdr *msg;
-};
 
 /*
  * struct gb_trans_ctx: Transport Context
@@ -81,7 +69,6 @@ static int read_data(int sock, void *data, size_t len)
 	return received;
 }
 
-
 /*
  * Helper to write data to socket
  */
@@ -101,39 +88,13 @@ static int write_data(int sock, const void *data, size_t len)
 }
 
 /*
- * Helper to allocation a greybus message
- */
-static struct gb_operation_hdr *gb_message_alloc(struct gb_operation_hdr *hdr)
-{
-	struct gb_operation_hdr *msg = k_heap_alloc(&gb_trans_heap, hdr->size, K_NO_WAIT);
-	if (!msg) {
-		return NULL;
-	}
-	memcpy(msg, hdr, sizeof(*hdr));
-	return msg;
-}
-
-/*
- * Helper to free a greybus message
- */
-static void gb_message_dealloc(struct gb_operation_hdr *msg)
-{
-	k_heap_free(&gb_trans_heap, msg);
-}
-
-static size_t gb_message_payload_len(const struct gb_operation_hdr *msg)
-{
-	return msg->size - sizeof(struct gb_operation_hdr);
-}
-
-/*
  * Helper to receive a greybus message from socket
  */
-static struct gb_message_in_transport gb_message_receive(int sock, bool *flag)
+static struct gb_msg_with_cport gb_message_receive(int sock, bool *flag)
 {
 	int ret;
 	struct gb_operation_hdr hdr;
-	struct gb_message_in_transport msg;
+	struct gb_msg_with_cport msg;
 
 	ret = read_data(sock, &msg.cport, sizeof(msg.cport));
 	if (ret != sizeof(msg.cport)) {
@@ -148,7 +109,7 @@ static struct gb_message_in_transport gb_message_receive(int sock, bool *flag)
 		goto early_exit;
 	}
 
-	msg.msg = gb_message_alloc(&hdr);
+	msg.msg = gb_message_alloc(gb_hdr_payload_len(&hdr), hdr.type, hdr.id, hdr.result);
 	if (!msg.msg) {
 		LOG_ERR("Failed to allocate node message");
 		goto early_exit;
@@ -188,39 +149,14 @@ static int gb_trans_listen_stop(unsigned int cport)
 	return 0;
 }
 
-static void *gb_trans_alloc_buf(size_t size)
-{
-	void *p = k_heap_alloc(&gb_trans_heap, size, K_NO_WAIT);
-
-	if (!p) {
-		LOG_ERR("Failed to allocate %zu bytes", size);
-	}
-
-	return p;
-}
-
-static void gb_trans_free_buf(void *ptr)
-{
-	k_heap_free(&gb_trans_heap, ptr);
-}
-
-static int gb_trans_send(unsigned int cport, const void *buf, size_t len)
+static int gb_trans_send(uint16_t cport, const struct gb_message *msg)
 {
 	int ret;
-	struct gb_operation_hdr *msg;
 	const __le16 cport_u16 = sys_cpu_to_le16(cport);
 
-	msg = (struct gb_operation_hdr *)buf;
-	// LOG_INF("Sending %u From cport %u %u", msg->id, cport_u16, cport);
-	if (NULL == msg) {
-		LOG_ERR("message is NULL");
-		return -EINVAL;
-	}
-
-	if (sys_le16_to_cpu(msg->size) != len || len < sizeof(*msg)) {
-		LOG_ERR("invalid message size %u (len: %u)", (unsigned)sys_le16_to_cpu(msg->size),
-			(unsigned)len);
-		return -EINVAL;
+	if (msg->header.result) {
+		LOG_INF("CPort %u, Type: %u, Result: %u, Id: %u", cport, msg->header.type,
+			msg->header.result, msg->header.id);
 	}
 
 	ret = write_data(ctx.client_sock, &cport_u16, sizeof(cport_u16));
@@ -228,7 +164,7 @@ static int gb_trans_send(unsigned int cport, const void *buf, size_t len)
 		return ret;
 	}
 
-	ret = write_data(ctx.client_sock, buf, len);
+	ret = write_data(ctx.client_sock, msg, sys_le16_to_cpu(msg->header.size));
 	return MIN(0, ret);
 }
 
@@ -237,10 +173,7 @@ static const struct gb_transport_backend gb_trans_backend = {
 	.exit = gb_trans_exit,
 	.listen = gb_trans_listen_start,
 	.stop_listening = gb_trans_listen_stop,
-	.alloc_buf = gb_trans_alloc_buf,
-	.free_buf = gb_trans_free_buf,
 	.send = gb_trans_send,
-	.send_async = NULL,
 };
 
 static int netsetup()
@@ -383,7 +316,7 @@ static void gb_trans_rx(struct gb_trans_ctx *ctx)
 {
 	int ret;
 	bool flag = false;
-	struct gb_message_in_transport msg;
+	struct gb_msg_with_cport msg;
 	struct zsock_pollfd fd = {
 		.fd = ctx->client_sock,
 		.events = ZSOCK_POLLIN,
@@ -408,11 +341,10 @@ static void gb_trans_rx(struct gb_trans_ctx *ctx)
 			return;
 		}
 
-		ret = greybus_rx_handler(msg.cport, msg.msg, sys_le16_to_cpu(msg.msg->size));
-		gb_message_dealloc(msg.msg);
-
+		ret = greybus_rx_handler(msg.cport, msg.msg);
 		if (ret < 0) {
 			LOG_ERR("Failed to receive greybus message");
+			gb_message_dealloc(msg.msg);
 		}
 	}
 }

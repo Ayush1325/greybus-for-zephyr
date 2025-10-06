@@ -89,7 +89,7 @@ static void uart_work_fn(struct k_work *work)
 	LOG_HEXDUMP_DBG(msg, msg_size, "RX:");
 
 	cport = sys_le16_to_cpu(*((uint16_t *)msg->pad));
-	r = greybus_rx_handler(cport, msg, sys_le16_to_cpu(msg->size));
+	r = greybus_rx_handler(cport, msg);
 	if (r < 0) {
 		LOG_DBG("failed to handle message : size: %u, id: %u, type: %u",
 			sys_le16_to_cpu(msg->size), sys_le16_to_cpu(msg->id), msg->type);

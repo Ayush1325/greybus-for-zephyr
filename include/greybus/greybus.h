@@ -65,21 +65,19 @@ enum gb_event {
 	GB_EVT_DISCONNECTED,
 };
 
-struct gb_operation;
+struct gb_message;
 
-typedef void (*gb_operation_callback)(struct gb_operation *operation);
-typedef uint8_t (*gb_operation_handler_t)(uint8_t type, struct gb_operation *operation);
+struct gb_msg_with_cport {
+	uint16_t cport;
+	struct gb_message *msg;
+};
 
 struct gb_transport_backend {
 	void (*init)(void);
 	void (*exit)(void);
 	int (*listen)(unsigned int cport);
 	int (*stop_listening)(unsigned int cport);
-	int (*send)(unsigned int cport, const void *buf, size_t len);
-	int (*send_async)(unsigned int cportid, const void *buf, size_t len,
-			  unipro_send_completion_t callback, void *priv);
-	void *(*alloc_buf)(size_t size);
-	void (*free_buf)(void *ptr);
+	int (*send)(uint16_t cport, const struct gb_message *msg);
 };
 
 struct gb_bundle {
@@ -89,29 +87,9 @@ struct gb_bundle {
 	void *priv;               /* private bundle data */
 };
 
-struct gb_operation {
-	void *fifo_reserved; /* 1st word reserved for use by FIFO */
+struct gb_driver;
 
-	unsigned int cport;
-	bool has_responded;
-	atomic_t ref_count;
-	struct timespec time;
-
-	void *request_buffer;
-	void *response_buffer;
-	bool is_unipro_rx_buf;
-
-	void *priv_data;
-
-	struct gb_operation *response;
-
-	struct gb_bundle *bundle;
-
-#ifdef CONFIG_GREYBUS_FEATURE_HAVE_TIMESTAMPS
-	struct timespec send_ts;
-	struct timespec recv_ts;
-#endif
-};
+typedef void (*gb_operation_handler_t)(struct gb_driver *drv, struct gb_message *msg, uint16_t cport);
 
 struct gb_driver {
 	/*
@@ -165,21 +143,6 @@ enum gb_operation_result {
 	GB_OP_INTERNAL = 0xff,
 };
 
-static inline void *gb_operation_get_response_payload(struct gb_operation *operation)
-{
-	return (char *)operation->response_buffer + sizeof(struct gb_operation_hdr);
-}
-
-static inline void *gb_operation_get_request_payload(struct gb_operation *operation)
-{
-	return (char *)operation->request_buffer + sizeof(struct gb_operation_hdr);
-}
-
-static inline struct gb_operation *gb_operation_get_response_op(struct gb_operation *op)
-{
-	return op->response;
-}
-
 static inline const char *gb_driver_name(struct gb_driver *driver)
 {
 	return driver->name;
@@ -204,18 +167,7 @@ int gb_listen(unsigned int cport);
 int gb_stop_listening(unsigned int cport);
 int gb_notify(unsigned cport, enum gb_event event);
 
-void gb_operation_destroy(struct gb_operation *operation);
-void *gb_operation_alloc_response(struct gb_operation *operation, size_t size);
-int gb_operation_send_response(struct gb_operation *operation, uint8_t result);
-int gb_operation_send_request_nowait(struct gb_operation *operation, bool need_response);
-int gb_operation_send_request(struct gb_operation *operation, bool need_response);
-struct gb_operation *gb_operation_create(unsigned int cport, uint8_t type, uint32_t req_size);
-void gb_operation_ref(struct gb_operation *operation);
-void gb_operation_unref(struct gb_operation *operation);
-size_t gb_operation_get_request_payload_size(struct gb_operation *operation);
-uint8_t gb_operation_get_request_result(struct gb_operation *operation);
-struct gb_bundle *gb_operation_get_bundle(struct gb_operation *operation);
-int greybus_rx_handler(unsigned int, void *, size_t);
+int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
 
 struct i2c_dev_s;
 int gb_i2c_set_dev(struct i2c_dev_s *dev);
