@@ -101,8 +101,6 @@ struct gb_operation {
 	void *response_buffer;
 	bool is_unipro_rx_buf;
 
-	sem_t sync_sem;
-
 	void *priv_data;
 
 	struct gb_operation *response;
