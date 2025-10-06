@@ -90,7 +90,7 @@ struct gb_bundle {
 };
 
 struct gb_operation {
-	void *fifo_reserved;   /* 1st word reserved for use by FIFO */
+	void *fifo_reserved; /* 1st word reserved for use by FIFO */
 
 	unsigned int cport;
 	bool has_responded;
@@ -101,11 +101,7 @@ struct gb_operation {
 	void *response_buffer;
 	bool is_unipro_rx_buf;
 
-	gb_operation_callback callback;
-	sem_t sync_sem;
-
 	void *priv_data;
-	sys_dnode_t node;
 
 	struct gb_operation *response;
 
@@ -152,6 +148,8 @@ struct gb_operation_hdr {
 enum gb_operation_type {
 	GB_TYPE_RESPONSE_FLAG = 0x80,
 };
+
+#define GB_RESPONSE(req) (req | GB_TYPE_RESPONSE_FLAG)
 
 enum gb_operation_result {
 	GB_OP_SUCCESS = 0x00,
@@ -209,11 +207,8 @@ int gb_notify(unsigned cport, enum gb_event event);
 void gb_operation_destroy(struct gb_operation *operation);
 void *gb_operation_alloc_response(struct gb_operation *operation, size_t size);
 int gb_operation_send_response(struct gb_operation *operation, uint8_t result);
-int gb_operation_send_request_nowait(struct gb_operation *operation, gb_operation_callback callback,
-				     bool need_response);
-int gb_operation_send_request_sync(struct gb_operation *operation);
-int gb_operation_send_request(struct gb_operation *operation, gb_operation_callback callback,
-			      bool need_response);
+int gb_operation_send_request_nowait(struct gb_operation *operation, bool need_response);
+int gb_operation_send_request(struct gb_operation *operation, bool need_response);
 struct gb_operation *gb_operation_create(unsigned int cport, uint8_t type, uint32_t req_size);
 void gb_operation_ref(struct gb_operation *operation);
 void gb_operation_unref(struct gb_operation *operation);

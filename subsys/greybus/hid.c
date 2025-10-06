@@ -486,7 +486,7 @@ static void *report_proc_thread(void *data)
 
 		node = node_dequeue(&hid_info->data_queue);
 		if (node) {
-			ret = gb_operation_send_request(node->operation, NULL, false);
+			ret = gb_operation_send_request(node->operation, false);
 			if (ret) {
 				LOG_INF("IRQ Event operation failed (%x)!", ret);
 			}

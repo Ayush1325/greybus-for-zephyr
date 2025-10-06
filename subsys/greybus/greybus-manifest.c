@@ -613,14 +613,7 @@ sys_dlist_t *get_manifest_cports(void)
 /* TODO: Replace this with sys_dlist_len after rebasing to master */
 size_t manifest_get_num_cports(void)
 {
-	struct gb_cport *gb_cport;
-	size_t r = 0;
-
-	SYS_DLIST_FOR_EACH_CONTAINER(&g_greybus.cports, gb_cport, node) {
-		r++;
-	}
-
-	return r;
+	return sys_dlist_len(&g_greybus.cports);
 }
 
 size_t manifest_get_num_cports_bundle(int bundle_id)

@@ -451,7 +451,7 @@ int gb_gpio_irq_event(int irq, void *context, void *priv)
 	gpio_pin_interrupt_configure(dev, request->which, GPIO_INT_MODE_DISABLED);
 
 	/* Send unidirectional operation. */
-	gb_operation_send_request_nowait(operation, NULL, false);
+	gb_operation_send_request_nowait(operation, false);
 
 	gb_operation_destroy(operation);
 

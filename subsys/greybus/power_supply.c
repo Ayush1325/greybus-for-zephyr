@@ -80,7 +80,7 @@ static int event_callback(void *data, uint8_t psy_id, uint8_t event)
 	request->psy_id = psy_id;
 	request->event = event;
 
-	gb_operation_send_request_nowait(operation, NULL, false);
+	gb_operation_send_request_nowait(operation, false);
 	gb_operation_destroy(operation);
 
 	return 0;

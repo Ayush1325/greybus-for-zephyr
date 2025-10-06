@@ -206,7 +206,7 @@ static void gb_audio_report_event(struct gb_audio_dai_info *dai, uint32_t event)
 	request->event = event;
 
 	/* TODO: What to do when this fails? */
-	gb_operation_send_request_nowait(operation, NULL, false);
+	gb_operation_send_request_nowait(operation, false);
 	gb_operation_destroy(operation);
 }
 
@@ -1178,14 +1178,6 @@ static uint8_t gb_audio_get_rx_delay_handler(struct gb_operation *operation)
 	return GB_OP_SUCCESS;
 }
 
-static void gb_audio_send_data_cb(struct gb_operation *operation)
-{
-	struct ring_buf *rb = operation->priv_data;
-
-	ring_buf_reset(rb);
-	ring_buf_pass(rb);
-}
-
 static int gb_audio_send_data(struct gb_audio_dai_info *dai, struct ring_buf *rb)
 {
 	struct gb_operation *operation;
@@ -1199,10 +1191,13 @@ static int gb_audio_send_data(struct gb_audio_dai_info *dai, struct ring_buf *rb
 	operation = ring_buf_get_priv(rb);
 	operation->priv_data = rb;
 
-	ret = gb_operation_send_request_nowait(operation, gb_audio_send_data_cb, false);
+	ret = gb_operation_send_request_nowait(operation, false);
 	if (ret) {
 		return ret;
 	}
+
+	ring_buf_reset(rb);
+	ring_buf_pass(rb);
 
 	return 0;
 }
@@ -1446,7 +1441,7 @@ static void gb_audio_codec_jack_event_cb(uint8_t widget_id, uint8_t widget_type,
 	request->event = gb_event;
 
 	/* TODO: What to do when this fails? */
-	gb_operation_send_request_nowait(operation, NULL, false);
+	gb_operation_send_request_nowait(operation, false);
 	gb_operation_destroy(operation);
 }
 
@@ -1481,7 +1476,7 @@ static void gb_audio_codec_button_event_cb(uint8_t widget_id, uint8_t button_id,
 	request->event = gb_event;
 
 	/* TODO: What to do when this fails? */
-	gb_operation_send_request_nowait(operation, NULL, false);
+	gb_operation_send_request_nowait(operation, false);
 	gb_operation_destroy(operation);
 }
 
