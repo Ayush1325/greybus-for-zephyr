@@ -26,6 +26,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "greybus_messages.h"
+#include "greybus_transport.h"
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
 #include <greybus/greybus.h>
@@ -59,19 +61,14 @@ LOG_MODULE_REGISTER(greybus_spi, CONFIG_GREYBUS_LOG_LEVEL);
  * @param operation pointer to structure of Greybus operation message
  * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_spi_protocol_version(struct gb_operation *operation)
+static void gb_spi_protocol_version(uint16_t cport, struct gb_message *req)
 {
-	struct gb_spi_proto_version_response *response;
+	const struct gb_spi_proto_version_response resp_data = {
+		.major = GB_SPI_VERSION_MAJOR,
+		.minor = GB_SPI_VERSION_MINOR,
+	};
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->major = GB_SPI_VERSION_MAJOR;
-	response->minor = GB_SPI_VERSION_MINOR;
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 static int device_spi_get_master_config(const struct device *dev,
@@ -95,35 +92,29 @@ static int device_spi_get_master_config(const struct device *dev,
 
 /**
  * @brief Returns a set of configuration parameters related to SPI master.
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_spi_protocol_master_config(struct gb_operation *operation)
+static void gb_spi_protocol_master_config(uint16_t cport, struct gb_message *req,
+					  const struct device *dev)
 {
-	struct gb_spi_master_config_response *response;
+	struct gb_spi_master_config_response resp_data;
 	int ret = 0;
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	ret = device_spi_get_master_config(gb_cport_to_device(operation->cport), response);
+	ret = device_spi_get_master_config(dev, &resp_data);
 	if (ret) {
-		return gb_errno_to_op_result(ret);
+		ret = gb_errno_to_op_result(ret);
+		gb_transport_message_empty_response_send(req, ret, cport);
 	}
 
 	/* TODO: use compile-time byte swap operators in platform/spi.c
 	 * so byteswapping is eliminated here */
-	response->bpw_mask = sys_cpu_to_le32(response->bpw_mask);
-	response->min_speed_hz = sys_cpu_to_le32(response->min_speed_hz);
-	response->max_speed_hz = sys_cpu_to_le32(response->max_speed_hz);
-	response->mode = sys_cpu_to_le16(response->mode);
-	response->flags = sys_cpu_to_le16(response->flags);
-	response->num_chipselect = sys_cpu_to_le16(response->num_chipselect);
+	resp_data.bpw_mask = sys_cpu_to_le32(resp_data.bpw_mask);
+	resp_data.min_speed_hz = sys_cpu_to_le32(resp_data.min_speed_hz);
+	resp_data.max_speed_hz = sys_cpu_to_le32(resp_data.max_speed_hz);
+	resp_data.mode = sys_cpu_to_le16(resp_data.mode);
+	resp_data.flags = sys_cpu_to_le16(resp_data.flags);
+	resp_data.num_chipselect = sys_cpu_to_le16(resp_data.num_chipselect);
 
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 static int device_spi_get_device_config(const struct device *dev, uint8_t cs,
@@ -146,43 +137,36 @@ static int device_spi_get_device_config(const struct device *dev, uint8_t cs,
  *
  * Returns a set of configuration parameters taht related to SPI device is
  * selected.
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_spi_protocol_device_config(struct gb_operation *operation)
+static void gb_spi_protocol_device_config(uint16_t cport, struct gb_message *req,
+					  const struct device *dev)
 {
-	struct gb_spi_device_config_request *request;
-	struct gb_spi_device_config_response *response;
-	size_t request_size;
+	const struct gb_spi_device_config_request *request =
+		(const struct gb_spi_device_config_request *)req->payload;
+	struct gb_spi_device_config_response resp_data;
 	uint8_t cs;
 	int ret = 0;
 
-	request_size = gb_operation_get_request_payload_size(operation);
-	if (request_size < sizeof(*request)) {
+	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	request = gb_operation_get_request_payload(operation);
 	cs = request->chip_select;
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
 
 	/* get selected chip of configuration */
-	ret = device_spi_get_device_config(gb_cport_to_device(operation->cport), cs, response);
+	ret = device_spi_get_device_config(dev, cs, &resp_data);
 	if (ret) {
-		return gb_errno_to_op_result(ret);
+		ret = gb_errno_to_op_result(ret);
+		gb_transport_message_empty_response_send(req, ret, cport);
 	}
 
 	/* TODO: use compile-time byte swap operators in platform/spi.c
 	 * so byteswapping is eliminated here */
-	response->mode = sys_cpu_to_le16(response->mode);
-	response->max_speed_hz = sys_cpu_to_le32(response->max_speed_hz);
+	resp_data.mode = sys_cpu_to_le16(resp_data.mode);
+	resp_data.max_speed_hz = sys_cpu_to_le32(resp_data.max_speed_hz);
 
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 static int request_to_spi_config(const struct gb_spi_transfer_request *const request,
@@ -261,20 +245,18 @@ static int request_to_spi_config(const struct gb_spi_transfer_request *const req
 /**
  * @brief Performs a SPI transaction as one or more SPI transfers, defined
  *        in the supplied array.
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_spi_protocol_transfer(struct gb_operation *operation)
+static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
+				     const struct device *dev)
 {
-	struct gb_spi_transfer_desc *desc;
-	struct gb_spi_transfer_request *request;
-	struct gb_spi_transfer_response *response;
+	struct gb_message *resp;
+	const struct gb_spi_transfer_desc *desc;
+	struct gb_spi_transfer_response *resp_data;
 	struct spi_config spi_config;
 	struct spi_cs_control spi_cs_control;
 
 	struct spi_buf_set _tx_buf_set;
-	struct spi_buf_set *const tx_buf_set = &_tx_buf_set;
+	struct spi_buf_set *tx_buf_set = &_tx_buf_set;
 	struct spi_buf *tx_buf = NULL;
 
 	struct spi_buf_set _rx_buf_set;
@@ -286,25 +268,18 @@ static uint8_t gb_spi_protocol_transfer(struct gb_operation *operation)
 	int i, op_count;
 	uint8_t bits_per_word;
 	int ret = 0, errcode = GB_OP_SUCCESS;
-	size_t request_size;
 	size_t expected_size;
+	const struct gb_spi_transfer_request *request =
+		(const struct gb_spi_transfer_request *)req->payload;
 
-	struct gb_bundle *bundle = gb_operation_get_bundle(operation);
-	__ASSERT_NO_MSG(bundle != NULL);
-	unsigned int cport_idx = operation->cport - bundle->cport_start;
-
-	request_size = gb_operation_get_request_payload_size(operation);
-	if (request_size < sizeof(*request)) {
+	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
-		errcode = GB_OP_INVALID;
-		goto out;
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	request = gb_operation_get_request_payload(operation);
 	op_count = sys_le16_to_cpu(request->count);
-
 	if (op_count == 0) {
-		return GB_OP_SUCCESS;
+		return gb_transport_message_empty_response_send(req, GB_OP_SUCCESS, cport);
 	}
 
 	write_data = (uint8_t *)&request->transfers[op_count];
@@ -315,7 +290,8 @@ static uint8_t gb_spi_protocol_transfer(struct gb_operation *operation)
 		if (desc->rdwr & GB_SPI_XFER_READ) {
 			if (sys_le32_to_cpu(desc->len) == 0) {
 				LOG_ERR("read operation of length 0 is invalid");
-				return GB_OP_INVALID;
+				return gb_transport_message_empty_response_send(req, GB_OP_INVALID,
+										cport);
 			}
 			read_data_size += sys_le32_to_cpu(desc->len);
 		}
@@ -323,13 +299,13 @@ static uint8_t gb_spi_protocol_transfer(struct gb_operation *operation)
 		/* ensure 1 bpw setting */
 		if (desc->bits_per_word != bits_per_word) {
 			LOG_ERR("only 1 bpw setting supported");
-			return GB_OP_INVALID;
+			return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 		}
 
 		/* ensure no cs_change */
 		if (desc->cs_change) {
 			LOG_ERR("cs_change not supported");
-			return GB_OP_INVALID;
+			return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 		}
 	}
 
@@ -343,17 +319,19 @@ static uint8_t gb_spi_protocol_transfer(struct gb_operation *operation)
 	}
 
 	expected_size = sizeof(*request) + op_count * sizeof(request->transfers[0]);
-	if (request_size < expected_size) {
+	if (gb_message_payload_len(req) < expected_size) {
 		LOG_ERR("dropping short message");
 		errcode = GB_OP_INVALID;
 		goto freebufs;
 	}
 
-	response = gb_operation_alloc_response(operation, read_data_size);
-	if (!response) {
-		errcode = GB_OP_NO_MEMORY;
+	resp = gb_message_alloc(read_data_size, GB_RESPONSE(req->header.type), req->header.id,
+				GB_OP_SUCCESS);
+	if (!resp) {
+		gb_transport_message_empty_response_send(req, GB_OP_NO_MEMORY, cport);
 		goto freebufs;
 	}
+	resp_data = (struct gb_spi_transfer_response *)resp->payload;
 
 	/* parse all transfer request from AP host side */
 	tx_buf_set->buffers = tx_buf;
@@ -362,7 +340,7 @@ static uint8_t gb_spi_protocol_transfer(struct gb_operation *operation)
 	if (read_data_size > 0) {
 		rx_buf_set->buffers = rx_buf;
 		rx_buf_set->count = 0;
-		read_data = response->data;
+		read_data = resp_data->data;
 	} else {
 		read_data = NULL;
 		rx_buf_set = NULL;
@@ -402,33 +380,40 @@ static uint8_t gb_spi_protocol_transfer(struct gb_operation *operation)
 		default:
 			LOG_ERR("invalid flags in rdwr %x", desc->rdwr);
 			errcode = GB_OP_INVALID;
-			goto freebufs;
+			goto freemsg;
 		}
 	}
 
 	/* set SPI configuration */
 	ret = request_to_spi_config(request, sys_le32_to_cpu(request->transfers[0].speed_hz),
-				    bits_per_word, bundle->dev[cport_idx], &spi_config,
-				    &spi_cs_control);
+				    bits_per_word, dev, &spi_config, &spi_cs_control);
 	if (ret) {
 		errcode = gb_errno_to_op_result(-ret);
-		goto freebufs;
+		goto freemsg;
 	}
 
 	/* start SPI transfer */
-	ret = spi_transceive(bundle->dev[cport_idx], &spi_config, tx_buf_set, rx_buf_set);
+	ret = spi_transceive(dev, &spi_config, tx_buf_set, rx_buf_set);
 	if (ret) {
 		errcode = gb_errno_to_op_result(-ret);
-		goto freebufs;
+		goto freemsg;
 	}
 
 	errcode = GB_OP_SUCCESS;
 
+	gb_transport_message_send(resp, cport);
+	gb_message_dealloc(resp);
+	return;
+
+freemsg:
+	gb_message_dealloc(resp);
+
 freebufs:
 	free(tx_buf);
+	free(rx_buf);
 
 out:
-	return errcode;
+	gb_transport_message_empty_response_send(req, errcode, cport);
 }
 
 /**
@@ -459,20 +444,22 @@ static void gb_spi_exit(unsigned int cport, struct gb_bundle *bundle)
 {
 }
 
-static uint8_t gb_spi_handler(uint8_t type, struct gb_operation *opr)
+static void gb_spi_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
 {
-	switch (type) {
+	const struct device *dev = gb_cport_to_device(cport);
+
+	switch (gb_message_type(msg)) {
 	case GB_SPI_PROTOCOL_VERSION:
-		return gb_spi_protocol_version(opr);
+		return gb_spi_protocol_version(cport, msg);
 	case GB_SPI_TYPE_MASTER_CONFIG:
-		return gb_spi_protocol_master_config(opr);
+		return gb_spi_protocol_master_config(cport, msg, dev);
 	case GB_SPI_TYPE_DEVICE_CONFIG:
-		return gb_spi_protocol_device_config(opr);
+		return gb_spi_protocol_device_config(cport, msg, dev);
 	case GB_SPI_PROTOCOL_TRANSFER:
-		return gb_spi_protocol_transfer(opr);
+		return gb_spi_protocol_transfer(cport, msg, dev);
 	default:
 		LOG_ERR("Invalid type");
-		return GB_OP_INVALID;
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 	}
 }
 

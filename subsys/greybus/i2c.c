@@ -36,43 +36,38 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include "greybus_messages.h"
+#include "greybus_transport.h"
 #include "i2c-gb.h"
 
 LOG_MODULE_REGISTER(greybus_i2c, CONFIG_GREYBUS_LOG_LEVEL);
 
-static uint8_t gb_i2c_protocol_version(struct gb_operation *operation)
+static void gb_i2c_protocol_version(uint16_t cport, struct gb_message *req)
 {
-	struct gb_i2c_proto_version_response *response;
+	const struct gb_i2c_proto_version_response resp_data = {
+		.major = GB_I2C_VERSION_MAJOR,
+		.minor = GB_I2C_VERSION_MINOR,
+	};
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->major = GB_I2C_VERSION_MAJOR;
-	response->minor = GB_I2C_VERSION_MINOR;
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-static uint8_t gb_i2c_protocol_functionality(struct gb_operation *operation)
+static void gb_i2c_protocol_functionality(uint16_t cport, struct gb_message *req)
 {
-	struct gb_i2c_functionality_rsp *response;
+	const struct gb_i2c_functionality_rsp resp_data = {
+		.functionality = sys_cpu_to_le32(
+			GB_I2C_FUNC_I2C | GB_I2C_FUNC_SMBUS_READ_BYTE |
+			GB_I2C_FUNC_SMBUS_WRITE_BYTE | GB_I2C_FUNC_SMBUS_READ_BYTE_DATA |
+			GB_I2C_FUNC_SMBUS_WRITE_BYTE_DATA | GB_I2C_FUNC_SMBUS_READ_WORD_DATA |
+			GB_I2C_FUNC_SMBUS_WRITE_WORD_DATA | GB_I2C_FUNC_SMBUS_READ_I2C_BLOCK |
+			GB_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK),
+	};
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->functionality = sys_cpu_to_le32(
-		GB_I2C_FUNC_I2C | GB_I2C_FUNC_SMBUS_READ_BYTE | GB_I2C_FUNC_SMBUS_WRITE_BYTE |
-		GB_I2C_FUNC_SMBUS_READ_BYTE_DATA | GB_I2C_FUNC_SMBUS_WRITE_BYTE_DATA |
-		GB_I2C_FUNC_SMBUS_READ_WORD_DATA | GB_I2C_FUNC_SMBUS_WRITE_WORD_DATA |
-		GB_I2C_FUNC_SMBUS_READ_I2C_BLOCK | GB_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK);
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-static uint8_t gb_i2c_protocol_transfer(struct gb_operation *operation)
+static void gb_i2c_protocol_transfer(uint16_t cport, struct gb_message *req,
+				     const struct device *dev)
 {
 	int i, op_count;
 	uint32_t size = 0;
@@ -80,28 +75,24 @@ static uint8_t gb_i2c_protocol_transfer(struct gb_operation *operation)
 	uint8_t *write_data;
 	bool read_op;
 	int read_count = 0;
-	struct gb_bundle *bundle = gb_operation_get_bundle(operation);
-	__ASSERT_NO_MSG(bundle != NULL);
-
-	unsigned int cport_idx = operation->cport - bundle->cport_start;
 	struct i2c_msg *requests;
 
-	struct gb_i2c_transfer_desc *desc;
-	struct gb_i2c_transfer_req *request;
-	struct gb_i2c_transfer_rsp *response;
-	const size_t req_size = gb_operation_get_request_payload_size(operation);
+	const struct gb_i2c_transfer_desc *desc;
+	const struct gb_i2c_transfer_req *request =
+		(const struct gb_i2c_transfer_req *)req->payload;
+	struct gb_message *resp;
+	struct gb_i2c_transfer_rsp *resp_data;
 	uint16_t addr = -1;
 
-	if (req_size < sizeof(*request)) {
-		return GB_OP_INVALID;
+	if (gb_message_payload_len(req) < sizeof(*request)) {
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	request = gb_operation_get_request_payload(operation);
 	op_count = sys_le16_to_cpu(request->op_count);
 	write_data = (uint8_t *)&request->desc[op_count];
 
-	if (req_size < sizeof(*request) + op_count * sizeof(request->desc[0])) {
-		return GB_OP_INVALID;
+	if (gb_message_payload_len(req) < sizeof(*request) + op_count * sizeof(request->desc[0])) {
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
 	for (i = 0; i < op_count; i++) {
@@ -113,14 +104,16 @@ static uint8_t gb_i2c_protocol_transfer(struct gb_operation *operation)
 		}
 	}
 
-	response = gb_operation_alloc_response(operation, size);
-	if (!response) {
-		return GB_OP_NO_MEMORY;
+	resp = gb_message_alloc(size, GB_RESPONSE(req->header.type), req->header.id, GB_OP_SUCCESS);
+	if (!resp) {
+		return gb_transport_message_empty_response_send(req, GB_OP_NO_MEMORY, cport);
 	}
+	resp_data = (struct gb_i2c_transfer_rsp *)resp->payload;
 
 	requests = malloc(sizeof(*requests) * op_count);
 	if (!requests) {
-		return GB_OP_NO_MEMORY;
+		ret = GB_OP_NO_MEMORY;
+		goto free_msg;
 	}
 
 	if (op_count > 0) {
@@ -142,7 +135,7 @@ static uint8_t gb_i2c_protocol_transfer(struct gb_operation *operation)
 
 		if (read_op) {
 			requests[i].flags |= I2C_MSG_READ;
-			requests[i].buf = &response->data[read_count];
+			requests[i].buf = &resp_data->data[read_count];
 			read_count += sys_le16_to_cpu(desc->size);
 		} else {
 			requests[i].buf = write_data;
@@ -150,12 +143,17 @@ static uint8_t gb_i2c_protocol_transfer(struct gb_operation *operation)
 		}
 	}
 
-	ret = i2c_transfer(bundle->dev[cport_idx], requests, op_count, addr);
+	ret = i2c_transfer(dev, requests, op_count, addr);
 
+	gb_transport_message_send(resp, cport);
+	return gb_message_dealloc(resp);
+
+free_msg:
+	gb_message_dealloc(resp);
 free_requests:
 	free(requests);
 
-	return gb_errno_to_op_result(ret);
+	return gb_transport_message_empty_response_send(req, ret, cport);
 }
 
 static int gb_i2c_init(unsigned int cport, struct gb_bundle *bundle)
@@ -177,18 +175,18 @@ static void gb_i2c_exit(unsigned int cport, struct gb_bundle *bundle)
 	ARG_UNUSED(bundle);
 }
 
-static uint8_t gb_i2c_handler(uint8_t type, struct gb_operation *opr)
+static void gb_i2c_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
 {
-	switch (type) {
+	switch (gb_message_type(msg)) {
 	case GB_I2C_PROTOCOL_VERSION:
-		return gb_i2c_protocol_version(opr);
+		return gb_i2c_protocol_version(cport, msg);
 	case GB_I2C_PROTOCOL_FUNCTIONALITY:
-		return gb_i2c_protocol_functionality(opr);
+		return gb_i2c_protocol_functionality(cport, msg);
 	case GB_I2C_PROTOCOL_TRANSFER:
-		return gb_i2c_protocol_transfer(opr);
+		return gb_i2c_protocol_transfer(cport, msg, gb_cport_to_device(cport));
 	default:
 		LOG_ERR("Invalid type");
-		return GB_OP_INVALID;
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 	}
 }
 

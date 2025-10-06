@@ -11,6 +11,12 @@ menuconfig GREYBUS
 
 if GREYBUS
 
+config GREYBUS_MESSAGES_HEAP_MEM_POOL_SIZE
+	int "Heap for Greybus messages"
+	default 2048
+	help
+	  Heap memory pre-allocated for greybus messages
+
 choice
 	prompt "Greybus Manifest Source"
 	default GREYBUS_MANIFEST_BUILTIN

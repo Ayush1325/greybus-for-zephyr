@@ -29,12 +29,14 @@
  */
 #include <zephyr/kernel.h>
 
+#include "greybus_cport.h"
 #include <unipro/unipro.h>
 #include <greybus/greybus.h>
+#include <greybus-utils/utils.h>
 #include <greybus/tape.h>
-// #include <wdog.h>
 #include "greybus-stubs.h"
-// #include <loopback-gb.h>
+#include "greybus_messages.h"
+#include "greybus_transport.h"
 #include <zephyr/logging/log.h>
 
 #include <greybus-utils/manifest.h>
@@ -55,27 +57,8 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
 
 LOG_MODULE_REGISTER(greybus, CONFIG_GREYBUS_LOG_LEVEL);
-
-#if !defined(CONFIG_POSIX_API)
-/*
- * Currently CONFIG_POSIX_API is incompatible with
- * CONFIG_NET_SOCKETS_POSIX_NAMES
- */
-#define clock_gettime _m_clock_gettime
-static int _m_clock_gettime(clockid_t clk_id, struct timespec *tp)
-{
-	ARG_UNUSED(clk_id);
-
-	uint64_t uptime_ms = k_uptime_get();
-	tp->tv_sec = uptime_ms / 1000;
-	tp->tv_nsec = (uptime_ms % 1000) * 1000000;
-
-	return 0;
-}
-#endif
 
 #define TIMEOUT_IN_MS 1000
 #define GB_PING_TYPE  0x00
@@ -91,16 +74,6 @@ static int _m_clock_gettime(clockid_t clk_id, struct timespec *tp)
 
 #define DEBUGASSERT(x)
 #define atomic_init(ptr, val) *(ptr) = val
-
-struct wdog_s {
-	int woof;
-};
-struct gb_cport_driver {
-	struct gb_driver *driver;
-	volatile bool exit_worker;
-	struct wdog_s timeout_wd;
-	struct gb_operation timedout_operation;
-};
 
 struct gb_tape_record_header {
 	uint16_t size;
@@ -119,21 +92,12 @@ static struct gb_operation_hdr timedout_hdr = {
 	.result = GB_OP_TIMEOUT,
 	.type = GB_TYPE_RESPONSE_FLAG,
 };
-static struct gb_operation_hdr oom_hdr = {
-	.size = sizeof(timedout_hdr),
-	.result = GB_OP_NO_MEMORY,
-	.type = GB_TYPE_RESPONSE_FLAG,
-};
 
-K_FIFO_DEFINE(gb_rx_fifo);
-
-K_MEM_SLAB_DEFINE_STATIC(gb_operation_slab, sizeof(struct gb_operation), 10, 4);
+K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), 10, 1);
 
 K_THREAD_STACK_DEFINE(gb_rx_thread_stack, 1536);
 static struct k_thread gb_rx_thread;
 static k_tid_t gb_rx_threadid;
-
-static struct gb_operation *_gb_operation_create(unsigned int cport);
 
 uint8_t gb_errno_to_op_result(int err)
 {
@@ -186,51 +150,15 @@ uint8_t gb_errno_to_op_result(int err)
 	}
 }
 
-#ifdef CONFIG_GREYBUS_FEATURE_HAVE_TIMESTAMPS
-static void op_mark_send_time(struct gb_operation *operation)
+static void gb_process_msg(struct gb_message *msg, uint16_t cport)
 {
-	clock_gettime(CLOCK_REALTIME, &operation->send_ts);
-}
+	struct gb_driver *drv = g_cport[cport].driver;
 
-static void op_mark_recv_time(struct gb_operation *operation)
-{
-	clock_gettime(CLOCK_REALTIME, &operation->recv_ts);
-}
-#else
-static void op_mark_send_time(struct gb_operation *operation)
-{
-}
-static void op_mark_recv_time(struct gb_operation *operation)
-{
-}
-#endif
-
-static void gb_process_request(struct gb_operation_hdr *hdr, struct gb_operation *operation)
-{
-	uint8_t result;
-
-	if (hdr->type == GB_PING_TYPE) {
-		gb_operation_send_response(operation, GB_OP_SUCCESS);
-		return;
+	if (gb_message_type(msg) == GB_PING_TYPE) {
+		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 	}
 
-	operation->bundle = g_cport[operation->cport].driver->bundle;
-	result = g_cport[operation->cport].driver->op_handler(hdr->type, operation);
-
-	LOG_DBG("CPort: %d, Type: %d, Result: %d", operation->cport, hdr->type, result);
-
-	if (hdr->id) {
-		gb_operation_send_response(operation, result);
-	}
-	op_mark_send_time(operation);
-}
-
-static void gb_process_response(struct gb_operation_hdr *hdr, struct gb_operation *operation)
-{
-	operation->bundle = g_cport[operation->cport].driver->bundle;
-	g_cport[operation->cport].driver->op_handler(hdr->type, operation);
-
-	gb_operation_unref(operation);
+	drv->op_handler(drv, msg, cport);
 }
 
 static void gb_pending_message_worker(void *p1, void *p2, void *p3)
@@ -239,73 +167,35 @@ static void gb_pending_message_worker(void *p1, void *p2, void *p3)
 	ARG_UNUSED(p2);
 	ARG_UNUSED(p3);
 
-	struct gb_operation *opr;
-	struct gb_operation_hdr *hdr;
+	int ret;
+	struct gb_msg_with_cport msg;
 
 	while (1) {
-		opr = k_fifo_get(&gb_rx_fifo, K_FOREVER);
-
-		if (g_cport[opr->cport].exit_worker) {
-			gb_operation_destroy(opr);
+		ret = k_msgq_get(&gb_rx_msgq, &msg, K_FOREVER);
+		if (ret < 0) {
 			continue;
 		}
 
-		hdr = opr->request_buffer;
-
-		if (hdr == &timedout_hdr) {
-			gb_operation_destroy(opr);
+		if (g_cport[msg.cport].exit_worker) {
+			gb_message_dealloc(msg.msg);
 			continue;
 		}
 
-		if (hdr->type & GB_TYPE_RESPONSE_FLAG) {
-			gb_process_response(hdr, opr);
-		} else {
-			gb_process_request(hdr, opr);
-		}
-
-		gb_operation_destroy(opr);
+		LOG_DBG("CPort: %d, Type: %d, Result: %d, Id: %u", msg.cport,
+			gb_message_type(msg.msg), msg.msg->header.result, msg.msg->header.id);
+		gb_process_msg(msg.msg, msg.cport);
 	}
 }
 
-#if defined(CONFIG_UNIPRO_ZERO_COPY)
-static struct gb_operation *gb_rx_create_operation(unsigned cport, void *data, size_t size)
+int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 {
-	struct gb_operation *op;
-
-	op = _gb_operation_create(cport);
-	if (!op) {
-		return NULL;
-	}
-
-	op->is_unipro_rx_buf = true;
-	op->request_buffer = data;
-
-	return op;
-}
-#else
-static struct gb_operation *gb_rx_create_operation(unsigned cport, void *data, size_t size)
-{
-	struct gb_operation *op;
-
-	op = gb_operation_create(cport, 0, size - sizeof(struct gb_operation_hdr));
-	if (!op) {
-		return NULL;
-	}
-
-	memcpy(op->request_buffer, data, size);
-
-	return op;
-}
-#endif
-
-int greybus_rx_handler(unsigned int cport, void *data, size_t size)
-{
-	struct gb_operation *op;
-	struct gb_operation_hdr *hdr = data;
-	size_t hdr_size;
+	const struct gb_msg_with_cport item = {
+		.cport = cport,
+		.msg = msg,
+	};
 
 	gb_loopback_log_entry(cport);
-	if (cport >= cport_count || !data) {
+	if (cport >= cport_count) {
 		LOG_ERR("Invalid cport number: %u", cport);
 		return -EINVAL;
 	}
@@ -314,39 +204,19 @@ int greybus_rx_handler(unsigned int cport, void *data, size_t size)
 		LOG_ERR("Cport %u does not have a valid driver registered", cport);
 		return 0;
 	}
-
-	if (sizeof(*hdr) > size) {
-		LOG_ERR("Dropping garbage request");
-		return -EINVAL; /* Dropping garbage request */
-	}
-
-	hdr_size = sys_le16_to_cpu(hdr->size);
-
-	if (hdr_size > size || sizeof(*hdr) > hdr_size) {
-		LOG_ERR("Dropping garbage request");
-		return -EINVAL; /* Dropping garbage request */
-	}
-
 	// LOG_HEXDUMP_DBG(data, size, "RX: ");
 
 	if (gb_tape && gb_tape_fd >= 0) {
 		struct gb_tape_record_header record_hdr = {
-			.size = size,
+			.size = msg->header.size,
 			.cport = cport,
 		};
 
 		gb_tape->write(gb_tape_fd, &record_hdr, sizeof(record_hdr));
-		gb_tape->write(gb_tape_fd, data, size);
+		gb_tape->write(gb_tape_fd, msg, msg->header.size);
 	}
 
-	op = gb_rx_create_operation(cport, data, hdr_size);
-	if (!op) {
-		return -ENOMEM;
-	}
-
-	op_mark_recv_time(op);
-
-	k_fifo_put(&gb_rx_fifo, op);
+	k_msgq_put(&gb_rx_msgq, &item, K_FOREVER);
 
 	return 0;
 }
@@ -487,320 +357,6 @@ int gb_stop_listening(unsigned int cport)
 	return transport_backend->stop_listening(cport);
 }
 
-static int gb_operation_send_request_nowait_cb(int status, const void *buf, void *priv)
-{
-	struct gb_operation *operation = priv;
-	struct gb_operation_hdr *hdr = operation->request_buffer;
-
-	hdr->result = status ? GB_OP_INTERNAL : 0;
-
-	gb_operation_unref(operation);
-
-	return 0;
-}
-
-int gb_operation_send_request_nowait(struct gb_operation *operation, bool need_response)
-{
-	struct gb_operation_hdr *hdr = operation->request_buffer;
-	int retval = 0;
-	int flags;
-
-	DEBUGASSERT(operation);
-	DEBUGASSERT(transport_backend);
-	DEBUGASSERT(transport_backend->send_async);
-
-	if (g_cport[operation->cport].exit_worker) {
-		return -ENETDOWN;
-	}
-
-	if (need_response) {
-		return -ENOTSUP;
-	}
-
-	hdr->id = 0;
-
-	// LOG_HEXDUMP_DBG(operation->request_buffer, hdr->size, "TX: ");
-
-	gb_operation_ref(operation);
-
-	flags = irq_lock();
-	retval = transport_backend->send_async(operation->cport, operation->request_buffer,
-					       sys_le16_to_cpu(hdr->size),
-					       gb_operation_send_request_nowait_cb, operation);
-	op_mark_send_time(operation);
-	irq_unlock(flags);
-
-	return retval;
-}
-
-int gb_operation_send_request(struct gb_operation *operation, bool need_response)
-{
-	struct gb_operation_hdr *hdr = operation->request_buffer;
-	int retval = 0;
-	int flags;
-
-	DEBUGASSERT(operation);
-	DEBUGASSERT(transport_backend);
-	DEBUGASSERT(transport_backend->send);
-
-	if (g_cport[operation->cport].exit_worker) {
-		return -ENETDOWN;
-	}
-
-	hdr->id = 0;
-
-	flags = irq_lock();
-
-	if (need_response) {
-		hdr->id = sys_cpu_to_le16(atomic_inc(&request_id));
-		if (hdr->id == 0) { /* ID 0 is for request with no response */
-			hdr->id = sys_cpu_to_le16(atomic_inc(&request_id));
-		}
-		clock_gettime(CLOCK_MONOTONIC, &operation->time);
-	}
-
-	// LOG_HEXDUMP_DBG(operation->request_buffer, hdr->size, "TX: ");
-	retval = transport_backend->send(operation->cport, operation->request_buffer,
-					 sys_le16_to_cpu(hdr->size));
-	op_mark_send_time(operation);
-	if (need_response && retval) {
-		gb_operation_unref(operation);
-	}
-
-	irq_unlock(flags);
-
-	return retval;
-}
-
-static int gb_operation_send_oom_response(struct gb_operation *operation)
-{
-	int retval;
-	int flags;
-	struct gb_operation_hdr *req_hdr = operation->request_buffer;
-
-	if (g_cport[operation->cport].exit_worker) {
-		return -ENETDOWN;
-	}
-
-	flags = irq_lock();
-
-	oom_hdr.id = req_hdr->id;
-	oom_hdr.type = GB_TYPE_RESPONSE_FLAG | req_hdr->type;
-
-	retval = transport_backend->send(operation->cport, &oom_hdr, sizeof(oom_hdr));
-
-	irq_unlock(flags);
-
-	return retval;
-}
-
-int gb_operation_send_response(struct gb_operation *operation, uint8_t result)
-{
-	struct gb_operation_hdr *resp_hdr;
-	int retval;
-	bool has_allocated_response = false;
-
-	DEBUGASSERT(operation);
-	DEBUGASSERT(transport_backend);
-	DEBUGASSERT(transport_backend->send);
-
-	if (g_cport[operation->cport].exit_worker) {
-		return -ENETDOWN;
-	}
-
-	if (operation->has_responded) {
-		return -EINVAL;
-	}
-
-	if (!operation->response_buffer) {
-		gb_operation_alloc_response(operation, 0);
-		if (!operation->response_buffer) {
-			return gb_operation_send_oom_response(operation);
-		}
-
-		has_allocated_response = true;
-	}
-
-	resp_hdr = operation->response_buffer;
-	resp_hdr->result = result;
-
-	gb_loopback_log_exit(operation->cport, operation, resp_hdr->size);
-	retval = transport_backend->send(operation->cport, operation->response_buffer,
-					 sys_le16_to_cpu(resp_hdr->size));
-	if (retval) {
-		LOG_ERR("Greybus backend failed to send: error %d", retval);
-		if (has_allocated_response) {
-			LOG_DBG("Free the response buffer");
-			transport_backend->free_buf(operation->response_buffer);
-			operation->response_buffer = NULL;
-		}
-		return retval;
-	}
-
-	operation->has_responded = true;
-	return retval;
-}
-
-void *gb_operation_alloc_response(struct gb_operation *operation, size_t size)
-{
-	struct gb_operation_hdr *req_hdr;
-	struct gb_operation_hdr *resp_hdr;
-
-	DEBUGASSERT(operation);
-
-	operation->response_buffer = transport_backend->alloc_buf(size + sizeof(*resp_hdr));
-	if (!operation->response_buffer) {
-		LOG_ERR("Can not allocate a response_buffer");
-		return NULL;
-	}
-
-	memset(operation->response_buffer, 0, size + sizeof(*resp_hdr));
-
-	req_hdr = operation->request_buffer;
-	resp_hdr = operation->response_buffer;
-
-	resp_hdr->size = sys_cpu_to_le16(size + sizeof(*resp_hdr));
-	resp_hdr->id = req_hdr->id;
-	resp_hdr->type = GB_TYPE_RESPONSE_FLAG | req_hdr->type;
-	return gb_operation_get_response_payload(operation);
-}
-
-void gb_operation_destroy(struct gb_operation *operation)
-{
-	DEBUGASSERT(operation);
-	gb_operation_unref(operation);
-}
-
-void gb_operation_ref(struct gb_operation *operation)
-{
-	DEBUGASSERT(operation);
-	DEBUGASSERT(atomic_get(&operation->ref_count) > 0);
-	atomic_inc(&operation->ref_count);
-}
-
-void gb_operation_unref(struct gb_operation *operation)
-{
-	DEBUGASSERT(operation);
-	DEBUGASSERT(atomic_get(&operation->ref_count) > 0);
-
-	/* zephyr atomic_dec(), via z_impl_atomic_sub(), returns the value
-	 * of the variable before it was decremented (much like the behaviour
-	 * defined in stdatomic.h with atomic_fetch_sub() */
-	uint32_t ref_count = atomic_dec(&operation->ref_count) - 1;
-	if (ref_count != 0) {
-		return;
-	}
-
-	if (operation->is_unipro_rx_buf) {
-		unipro_rxbuf_free(operation->cport, operation->request_buffer);
-	} else {
-		transport_backend->free_buf(operation->request_buffer);
-	}
-
-	transport_backend->free_buf(operation->response_buffer);
-	if (operation->response) {
-		gb_operation_unref(operation->response);
-	}
-	k_mem_slab_free(&gb_operation_slab, operation);
-}
-
-static struct gb_operation *_gb_operation_create(unsigned int cport)
-{
-	int ret;
-	struct gb_operation *operation;
-
-	if (cport >= cport_count) {
-		return NULL;
-	}
-
-	ret = k_mem_slab_alloc(&gb_operation_slab, (void **)&operation, K_FOREVER);
-	if (ret < 0) {
-		return NULL;
-	}
-
-	memset(operation, 0, sizeof(*operation));
-	operation->cport = cport;
-
-	atomic_init(&operation->ref_count, 1);
-
-	return operation;
-}
-
-struct gb_operation *gb_operation_create(unsigned int cport, uint8_t type, uint32_t req_size)
-{
-	struct gb_operation *operation;
-	struct gb_operation_hdr *hdr;
-
-	if (cport >= cport_count) {
-		return NULL;
-	}
-
-	operation = _gb_operation_create(cport);
-	if (!operation) {
-		return NULL;
-	}
-
-	operation->request_buffer = transport_backend->alloc_buf(req_size + sizeof(*hdr));
-	if (!operation->request_buffer) {
-		goto malloc_error;
-	}
-
-	memset(operation->request_buffer, 0, req_size + sizeof(*hdr));
-	hdr = operation->request_buffer;
-	hdr->size = sys_cpu_to_le16(req_size + sizeof(*hdr));
-	hdr->type = type;
-
-	return operation;
-malloc_error:
-	k_mem_slab_free(&gb_operation_slab, operation);
-	return NULL;
-}
-
-size_t gb_operation_get_request_payload_size(struct gb_operation *operation)
-{
-	struct gb_operation_hdr *hdr;
-
-	if (!operation || !operation->request_buffer) {
-		return 0;
-	}
-
-	hdr = operation->request_buffer;
-	if (sys_le16_to_cpu(hdr->size) < sizeof(*hdr)) {
-		return 0;
-	}
-
-	return sys_le16_to_cpu(hdr->size) - sizeof(*hdr);
-}
-
-uint8_t gb_operation_get_request_result(struct gb_operation *operation)
-{
-	struct gb_operation_hdr *hdr;
-
-	if (!operation) {
-		return GB_OP_INTERNAL;
-	}
-
-	if (!operation->response) {
-		return GB_OP_TIMEOUT;
-	}
-
-	hdr = operation->response->request_buffer;
-	if (!hdr || hdr->size < sizeof(*hdr)) {
-		return GB_OP_INTERNAL;
-	}
-
-	return hdr->result;
-}
-
-struct gb_bundle *gb_operation_get_bundle(struct gb_operation *operation)
-{
-	if (!operation) {
-		return NULL;
-	}
-
-	return operation->bundle;
-}
-
 int gb_init(struct gb_transport_backend *transport)
 {
 	size_t num_bundles = manifest_get_max_bundle_id() + 1;
@@ -828,7 +384,6 @@ int gb_init(struct gb_transport_backend *transport)
 
 	for (i = 0; i < cport_count; i++) {
 		wd_static(&g_cport[i].timeout_wd);
-		g_cport[i].timedout_operation.request_buffer = &timedout_hdr;
 	}
 
 	atomic_init(&request_id, (uint32_t)0);
@@ -953,7 +508,7 @@ int gb_tape_replay(const char *pathname)
 			break;
 		}
 
-		greybus_rx_handler(hdr.cport, buffer, nread);
+		greybus_rx_handler(hdr.cport, (struct gb_message *)buffer);
 	}
 
 	free(buffer);
@@ -1001,4 +556,18 @@ struct gb_bundle *gb_bundle_get_by_id(unsigned int bundle_id)
 	}
 
 	return g_bundle[bundle_id];
+}
+
+struct gb_cport_driver *gb_cport_get(uint16_t cport)
+{
+	if (cport > manifest_get_num_cports()) {
+		return NULL;
+	}
+
+	return &g_cport[cport];
+}
+
+struct gb_transport_backend *gb_transport_get(void)
+{
+	return transport_backend;
 }

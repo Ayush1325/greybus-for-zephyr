@@ -51,7 +51,7 @@ static void gpio_callback_handler(const struct device *port, struct gpio_callbac
 
 	int r;
 	const struct gb_transport_backend *xport;
-	unsigned int cport;
+	uint16_t cport;
 	uint8_t req_[0 + sizeof(struct gb_operation_hdr) +
 		     sizeof(struct gb_gpio_irq_event_request)] = {};
 	struct gb_operation_hdr *const req = (struct gb_operation_hdr *)req_;
@@ -70,7 +70,7 @@ static void gpio_callback_handler(const struct device *port, struct gpio_callbac
 	for (size_t i = 0; i < GPIO_MAX_PINS_PER_PORT && pins != 0; ++i, pins >>= 1) {
 		if (pins & 1) {
 			irq_event_req->which = i;
-			r = xport->send(cport, req_, sizeof(req_));
+			r = xport->send(cport, (const struct gb_message *)req_);
 			if (r != 0) {
 				LOG_ERR("xport->send() failed: %d", r);
 			}
