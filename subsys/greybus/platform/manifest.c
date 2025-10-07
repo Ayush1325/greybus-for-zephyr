@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <errno.h>
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
+#include <greybus-utils/manifest.h>
 
 struct greybus_manifest_cport {
 	uint8_t bundle;
@@ -38,8 +38,6 @@ struct greybus_manifest_cport {
 #define _GREYBUS_MANIFEST_BUNDLES_SIZE(n) (GREYBUS_MANIFEST_BUNDLE_SIZE * n)
 #define _GREYBUS_MANIFEST_CPORTS_SIZE(n)  (GREYBUS_MANIFEST_CPORT_SIZE * n)
 
-#define _GREYBUS_BASE_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_greybus)
-
 #define GREYBUS_MANFIEST_CPORT(_bundle, _protocol)                                                 \
 	{                                                                                          \
 		.bundle = _bundle,                                                                 \
@@ -64,14 +62,14 @@ struct greybus_manifest_cport {
 static uint8_t bundles[] = {
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_BUNDLE_HANDLER)};
 
-static struct greybus_manifest_cport cports[] = {
+static struct greybus_manifest_cport cports[GREYBUS_CPORT_COUNT] = {
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_CPORT_HANDLER)};
 
 #define GREYBUS_MANIFEST_SIZE                                                                      \
 	(sizeof(struct greybus_manifest_header) + GREYBUS_MANIFEST_INTERFACE_SIZE +                \
 	 GREYBUS_MANIFEST_STRING_SIZE(CONFIG_GREYBUS_VENDOR_STRING) +                              \
 	 GREYBUS_MANIFEST_STRING_SIZE(CONFIG_GREYBUS_PRODUCT_STRING) +                             \
-	 _GREYBUS_MANIFEST_CPORTS_SIZE(ARRAY_SIZE(cports)) +                                       \
+	 _GREYBUS_MANIFEST_CPORTS_SIZE(GREYBUS_CPORT_COUNT) +                                       \
 	 _GREYBUS_MANIFEST_BUNDLES_SIZE(ARRAY_SIZE(bundles)))
 
 #include "../greybus-manifest.h"
