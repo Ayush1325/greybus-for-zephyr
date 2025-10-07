@@ -26,15 +26,11 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-// #include <queue.h>
 
 #include <zephyr/device.h>
-// #include <device_hid.h>
 #include <greybus/greybus.h>
-// #include <apps/greybus-utils/utils.h>
 
 #include <zephyr/sys/byteorder.h>
 

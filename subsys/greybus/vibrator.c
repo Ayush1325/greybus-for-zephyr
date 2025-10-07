@@ -27,11 +27,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <errno.h>
-#include <stdlib.h>
-
 #include <greybus/greybus.h>
-#include <apps/greybus-utils/utils.h>
 #include <gpio.h>
 #include <sys/byteorder.h>
 

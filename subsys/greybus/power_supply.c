@@ -32,7 +32,6 @@
 
 #include <zephyr/sys/byteorder.h>
 #include <greybus/greybus.h>
-#include <apps/greybus-utils/utils.h>
 
 #include "power_supply-gb.h"
 #include <device_power_supply.h>

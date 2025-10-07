@@ -32,7 +32,6 @@
 #include "greybus_cport.h"
 #include <unipro/unipro.h>
 #include <greybus/greybus.h>
-#include <greybus-utils/utils.h>
 #include <greybus/tape.h>
 #include "greybus-stubs.h"
 #include "greybus_messages.h"
