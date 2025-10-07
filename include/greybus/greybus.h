@@ -33,20 +33,10 @@
 
 #include <stddef.h>
 #include <stdbool.h>
-#if defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) || defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) ||        \
-	defined(CONFIG_BOARD_NRF52_BSIM)
-#include <pthread.h>
-#include <semaphore.h>
-#else
-#include <zephyr/posix/pthread.h>
-#endif
-
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/dlist.h>
-// #include <util.h>
 #include <unipro/unipro.h>
 #include <greybus/types.h>
-#include <time.h>
 
 #ifndef OK
 enum {
@@ -169,12 +159,6 @@ int gb_notify(unsigned cport, enum gb_event event);
 
 int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
 
-struct i2c_dev_s;
-int gb_i2c_set_dev(struct i2c_dev_s *dev);
-struct i2c_dev_s *gb_i2c_get_dev(void);
-
 uint8_t gb_errno_to_op_result(int err);
-
-struct gb_bundle *gb_bundle_get_by_id(unsigned int bundle_id);
 
 #endif /* _GREYBUS_H_ */
