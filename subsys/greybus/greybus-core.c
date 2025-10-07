@@ -32,7 +32,6 @@
 #include "greybus_cport.h"
 #include <unipro/unipro.h>
 #include <greybus/greybus.h>
-#include "greybus-stubs.h"
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <zephyr/logging/log.h>
@@ -74,15 +73,9 @@ LOG_MODULE_REGISTER(greybus, CONFIG_GREYBUS_LOG_LEVEL);
 #define atomic_init(ptr, val) *(ptr) = val
 
 static unsigned int cport_count;
-static atomic_t request_id;
 static struct gb_cport_driver *g_cport;
 static struct gb_bundle **g_bundle;
 static struct gb_transport_backend *transport_backend;
-static struct gb_operation_hdr timedout_hdr = {
-	.size = sizeof(timedout_hdr),
-	.result = GB_OP_TIMEOUT,
-	.type = GB_TYPE_RESPONSE_FLAG,
-};
 
 K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), 10, 1);
 
@@ -185,7 +178,6 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 		.msg = msg,
 	};
 
-	gb_loopback_log_entry(cport);
 	if (cport >= cport_count) {
 		LOG_ERR("Invalid cport number: %u", cport);
 		return -EINVAL;
@@ -211,8 +203,6 @@ int gb_unregister_driver(unsigned int cport)
 	if (transport_backend->stop_listening) {
 		transport_backend->stop_listening(cport);
 	}
-
-	wd_cancel(&g_cport[cport].timeout_wd);
 
 	g_cport[cport].exit_worker = true;
 
@@ -341,7 +331,6 @@ int gb_stop_listening(unsigned int cport)
 int gb_init(struct gb_transport_backend *transport)
 {
 	size_t num_bundles = manifest_get_max_bundle_id() + 1;
-	int i;
 
 	if (!transport) {
 		return -EINVAL;
@@ -363,12 +352,6 @@ int gb_init(struct gb_transport_backend *transport)
 		&gb_rx_thread, gb_rx_thread_stack, K_THREAD_STACK_SIZEOF(gb_rx_thread_stack),
 		gb_pending_message_worker, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
 
-	for (i = 0; i < cport_count; i++) {
-		wd_static(&g_cport[i].timeout_wd);
-	}
-
-	atomic_init(&request_id, (uint32_t)0);
-
 	transport_backend = transport;
 	transport_backend->init();
 
@@ -385,8 +368,6 @@ void gb_deinit(void)
 
 	for (i = 0; i < cport_count; i++) {
 		gb_unregister_driver(i);
-
-		wd_delete(&g_cport[i].timeout_wd);
 	}
 
 	k_thread_abort(gb_rx_threadid);

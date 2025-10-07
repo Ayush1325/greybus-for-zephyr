@@ -1,33 +1,10 @@
 #include <stdint.h>
-#include <errno.h>
 #include <unipro/unipro.h>
 #include <zephyr/logging/log.h>
 
 #include "greybus-stubs.h"
 
 LOG_MODULE_REGISTER(greybus_stubs, LOG_LEVEL_INF);
-
-void wd_cancel(struct wdog_s *wd)
-{
-	(void)wd;
-	LOG_DBG("");
-}
-void wd_delete(struct wdog_s *wd)
-{
-	(void)wd;
-	LOG_DBG("");
-}
-void wd_start(struct wdog_s *wd, unsigned long delay, void (*callback)(int, uint32_t, ...),
-	      int integer, uint16_t cport)
-{
-	(void)wd;
-	LOG_DBG("");
-}
-void wd_static(struct wdog_s *wd)
-{
-	(void)wd;
-	LOG_DBG("");
-}
 
 void unipro_init(void)
 {
@@ -94,11 +71,5 @@ void timesync_authoritative()
 {
 }
 void timesync_get_last_event()
-{
-}
-void gb_loopback_log_exit()
-{
-}
-void gb_loopback_log_entry()
 {
 }

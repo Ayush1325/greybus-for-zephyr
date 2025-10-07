@@ -9,14 +9,9 @@
 
 #include <greybus/greybus.h>
 
-struct wdog_s {
-	int woof;
-};
-
 struct gb_cport_driver {
 	struct gb_driver *driver;
 	volatile bool exit_worker;
-	struct wdog_s timeout_wd;
 };
 
 struct gb_cport_driver *gb_cport_get(uint16_t cport);
