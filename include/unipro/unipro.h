@@ -69,21 +69,6 @@ int unipro_reset_cport(unsigned int cportid, cport_reset_completion_cb_t cb, voi
 #define CPORT_FLAGS_CSV_N            (4)
 
 /*
- * Mailbox ACK attribute, ES specific.
- * Used to handshake the SVC and the bridges.
- *
- * The Switch is using both ES2 and ES3 attributes for compatibility
- * with modules.
- *
- * For ES2 an unrelated attribute is repurposed.
- * Warning: this attribute is used by the Unipro traffic generation on the
- * switch, cf. 'svc t' command
- */
-#define ES2_MBOX_ACK_ATTR    T_TSTSRCINTERMESSAGEGAP
-#define ES3_SYSTEM_STATUS_15 0x610f
-#define ES3_MBOX_ACK_ATTR    ES3_SYSTEM_STATUS_15
-
-/*
  * Lower level attribute read/write.
  *
  * Please use one of the unipro_{local,peer}_attr_{read,write}()
