@@ -34,10 +34,6 @@
 #include <greybus/greybus.h>
 #include <greybus/loopback.h> /* For greybus loopback request types. */
 
-#ifdef CONFIG_GREYBUS_FEATURE_HAVE_TIMESTAMPS
-void gb_loopback_log_entry(unsigned int cport);
-void gb_loopback_log_exit(unsigned int cport, struct gb_operation *operation, size_t size);
-#else
 static inline void gb_loopback_log_entry(unsigned int cport)
 {
 }
@@ -45,6 +41,5 @@ static inline void gb_loopback_log_exit(unsigned int cport, struct gb_operation 
 					size_t size)
 {
 }
-#endif
 
 #endif

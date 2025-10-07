@@ -51,7 +51,6 @@ struct gb_loopback {
 	struct list_head list;
 	pthread_mutex_t lock;
 	int cport;
-	struct gb_timestamp ts;
 	struct gb_loopback_statistics stats;
 };
 
@@ -188,76 +187,10 @@ int gb_loopback_cport_valid(int cport)
 	return loopback_from_cport(cport) != NULL;
 }
 
-/*
- * If xfer is true, then we have to multiply the number of bytes in the
- * payload by 2 to account for sending the data back.
- */
-#if defined(CONFIG_GREYBUS_FEATURE_HAVE_TIMESTAMPS)
-static void update_loopback_stats(struct gb_operation *operation, int xfer)
-{
-	struct gb_loopback_transfer_request *request;
-	struct gb_loopback_statistics *stats;
-	struct gb_loopback *loopback;
-	struct timespec ts_total;
-	unsigned tps, rps;
-	useconds_t total;
-	size_t tpr;
 
-	timespecsub(&operation->recv_ts, &operation->send_ts, &ts_total);
-	total = timespec_to_usec(&ts_total);
-
-	loopback = loopback_from_cport(operation->cport);
-	if (!loopback) {
-		return;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-	tpr = request->len * (xfer ? 2 : 1);
-	tps = tpr * DIV_ROUND_CLOSEST(USEC_PER_SEC, total);
-	rps = DIV_ROUND_CLOSEST(USEC_PER_SEC, total);
-	stats = &loopback->stats;
-
-#define UPDATE_AVG(avg, new)                                                                       \
-	do {                                                                                       \
-		if ((avg) == 0)                                                                    \
-			(avg) = (new);                                                             \
-		else                                                                               \
-			(avg) = DIV_ROUND_CLOSEST((avg) + (new), 2);                               \
-	} while (0)
-
-#define UPDATE_MIN(min, avg)                                                                       \
-	do {                                                                                       \
-		if ((min) == 0)                                                                    \
-			(min) = (avg);                                                             \
-		else if ((avg) < (min))                                                            \
-			(min) = (avg);                                                             \
-	} while (0)
-
-#define UPDATE_MAX(max, avg)                                                                       \
-	do {                                                                                       \
-		if ((avg) > (max))                                                                 \
-			(max) = (avg);                                                             \
-	} while (0)
-
-	UPDATE_AVG(stats->latency_avg, total);
-	UPDATE_AVG(stats->throughput_avg, tps);
-	UPDATE_AVG(stats->reqs_per_sec_avg, rps);
-	UPDATE_MIN(stats->latency_min, stats->latency_avg);
-	UPDATE_MIN(stats->throughput_min, stats->throughput_avg);
-	UPDATE_MIN(stats->reqs_per_sec_min, stats->reqs_per_sec_avg);
-	UPDATE_MAX(stats->latency_max, stats->latency_avg);
-	UPDATE_MAX(stats->throughput_max, stats->throughput_avg);
-	UPDATE_MAX(stats->reqs_per_sec_max, stats->reqs_per_sec_avg);
-
-#undef UPDATE_AVG
-#undef UPDATE_MIN
-#undef UPDATE_MAX
-}
-#else
 static void update_loopback_stats(struct gb_operation *operation, int xfer)
 {
 }
-#endif /* CONFIG_GREYBUS_FEATURE_HAVE_TIMESTAMPS */
 
 /* Callbacks for gb_operation_send_request(). */
 
@@ -428,34 +361,6 @@ struct gb_driver loopback_driver = {
 	.op_handler = gb_loopback_handler,
 };
 
-#ifdef CONFIG_GREYBUS_FEATURE_HAVE_TIMESTAMPS
-void gb_loopback_log_entry(unsigned int cport)
-{
-	struct gb_loopback *loopback;
-
-	loopback = loopback_from_cport(cport);
-	if (!loopback) {
-		return;
-	}
-
-	gb_timestamp_tag_entry_time(&loopback->ts, cport);
-}
-
-void gb_loopback_log_exit(unsigned int cport, struct gb_operation *operation, size_t size)
-{
-	struct gb_loopback *loopback;
-
-	loopback = loopback_from_cport(cport);
-	if (!loopback) {
-		return;
-	}
-
-	gb_timestamp_tag_exit_time(&loopback->ts, cport);
-	gb_timestamp_log(&loopback->ts, cport, operation->response_buffer, size,
-			 GREYBUS_FW_TIMESTAMP_GPBRDIGE);
-}
-#endif
-
 void gb_loopback_register(int cport, int bundle)
 {
 	struct gb_loopback *loopback = zalloc(sizeof(*loopback));
@@ -469,6 +374,5 @@ void gb_loopback_register(int cport, int bundle)
 		list_add(&gb_loopback_list, &loopback->list);
 		irq_unlock(flags);
 	}
-	gb_timestamp_init();
 	gb_register_driver(cport, bundle, &loopback_driver);
 }
