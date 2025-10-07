@@ -35,7 +35,6 @@
 #include <zephyr/device_pwm.h>
 #include <greybus/greybus.h>
 #include <zephyr/sys/byteorder.h>
-#include <apps/greybus-utils/utils.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(greybus_pwm, CONFIG_GREYBUS_LOG_LEVEL);

@@ -39,7 +39,6 @@
 #include <greybus/types.h>
 #include <greybus/greybus.h>
 #include <unipro/unipro.h>
-#include <apps/greybus-utils/utils.h>
 #include <zephyr/sys/byteorder.h>
 
 #include <zephyr/logging/log.h>

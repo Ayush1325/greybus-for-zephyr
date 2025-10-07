@@ -32,9 +32,6 @@
 #include "greybus_cport.h"
 #include <unipro/unipro.h>
 #include <greybus/greybus.h>
-#include <greybus-utils/utils.h>
-#include <greybus/tape.h>
-#include "greybus-stubs.h"
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <zephyr/logging/log.h>
@@ -75,23 +72,10 @@ LOG_MODULE_REGISTER(greybus, CONFIG_GREYBUS_LOG_LEVEL);
 #define DEBUGASSERT(x)
 #define atomic_init(ptr, val) *(ptr) = val
 
-struct gb_tape_record_header {
-	uint16_t size;
-	uint16_t cport;
-};
-
 static unsigned int cport_count;
-static atomic_t request_id;
 static struct gb_cport_driver *g_cport;
 static struct gb_bundle **g_bundle;
 static struct gb_transport_backend *transport_backend;
-static struct gb_tape_mechanism *gb_tape;
-static int gb_tape_fd = -EBADF;
-static struct gb_operation_hdr timedout_hdr = {
-	.size = sizeof(timedout_hdr),
-	.result = GB_OP_TIMEOUT,
-	.type = GB_TYPE_RESPONSE_FLAG,
-};
 
 K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), 10, 1);
 
@@ -194,7 +178,6 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 		.msg = msg,
 	};
 
-	gb_loopback_log_entry(cport);
 	if (cport >= cport_count) {
 		LOG_ERR("Invalid cport number: %u", cport);
 		return -EINVAL;
@@ -205,16 +188,6 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 		return 0;
 	}
 	// LOG_HEXDUMP_DBG(data, size, "RX: ");
-
-	if (gb_tape && gb_tape_fd >= 0) {
-		struct gb_tape_record_header record_hdr = {
-			.size = msg->header.size,
-			.cport = cport,
-		};
-
-		gb_tape->write(gb_tape_fd, &record_hdr, sizeof(record_hdr));
-		gb_tape->write(gb_tape_fd, msg, msg->header.size);
-	}
 
 	k_msgq_put(&gb_rx_msgq, &item, K_FOREVER);
 
@@ -230,8 +203,6 @@ int gb_unregister_driver(unsigned int cport)
 	if (transport_backend->stop_listening) {
 		transport_backend->stop_listening(cport);
 	}
-
-	wd_cancel(&g_cport[cport].timeout_wd);
 
 	g_cport[cport].exit_worker = true;
 
@@ -360,7 +331,6 @@ int gb_stop_listening(unsigned int cport)
 int gb_init(struct gb_transport_backend *transport)
 {
 	size_t num_bundles = manifest_get_max_bundle_id() + 1;
-	int i;
 
 	if (!transport) {
 		return -EINVAL;
@@ -382,12 +352,6 @@ int gb_init(struct gb_transport_backend *transport)
 		&gb_rx_thread, gb_rx_thread_stack, K_THREAD_STACK_SIZEOF(gb_rx_thread_stack),
 		gb_pending_message_worker, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
 
-	for (i = 0; i < cport_count; i++) {
-		wd_static(&g_cport[i].timeout_wd);
-	}
-
-	atomic_init(&request_id, (uint32_t)0);
-
 	transport_backend = transport;
 	transport_backend->init();
 
@@ -404,8 +368,6 @@ void gb_deinit(void)
 
 	for (i = 0; i < cport_count; i++) {
 		gb_unregister_driver(i);
-
-		wd_delete(&g_cport[i].timeout_wd);
 	}
 
 	k_thread_abort(gb_rx_threadid);
@@ -416,107 +378,6 @@ void gb_deinit(void)
 		transport_backend->exit();
 	}
 	transport_backend = NULL;
-}
-
-int gb_tape_register_mechanism(struct gb_tape_mechanism *mechanism)
-{
-	if (!mechanism || !mechanism->open || !mechanism->close || !mechanism->read ||
-	    !mechanism->write) {
-		return -EINVAL;
-	}
-
-	if (gb_tape) {
-		return -EBUSY;
-	}
-
-	gb_tape = mechanism;
-
-	return 0;
-}
-
-int gb_tape_communication(const char *pathname)
-{
-	if (!gb_tape) {
-		return -EINVAL;
-	}
-
-	if (gb_tape_fd >= 0) {
-		return -EBUSY;
-	}
-
-	gb_tape_fd = gb_tape->open(pathname, GB_TAPE_WRONLY);
-	if (gb_tape_fd < 0) {
-		return gb_tape_fd;
-	}
-
-	return 0;
-}
-
-int gb_tape_stop(void)
-{
-	if (!gb_tape || gb_tape_fd < 0) {
-		return -EINVAL;
-	}
-
-	gb_tape->close(gb_tape_fd);
-	gb_tape_fd = -EBADF;
-
-	return 0;
-}
-
-int gb_tape_replay(const char *pathname)
-{
-	struct gb_tape_record_header hdr;
-	char *buffer;
-	ssize_t nread;
-	int retval = 0;
-	int fd;
-
-	if (!pathname || !gb_tape) {
-		return -EINVAL;
-	}
-
-	LOG_DBG("greybus: replaying '%s'...", pathname);
-
-	fd = gb_tape->open(pathname, GB_TAPE_RDONLY);
-	if (fd < 0) {
-		return fd;
-	}
-
-	buffer = malloc(CPORT_BUF_SIZE);
-	if (!buffer) {
-		retval = -ENOMEM;
-		goto error_buffer_alloc;
-	}
-
-	while (1) {
-		nread = gb_tape->read(fd, &hdr, sizeof(hdr));
-		if (!nread) {
-			break;
-		}
-
-		if (nread != sizeof(hdr)) {
-			LOG_ERR("gb-tape: invalid byte count read, aborting...");
-			retval = -EIO;
-			break;
-		}
-
-		nread = gb_tape->read(fd, buffer, hdr.size);
-		if (hdr.size != nread) {
-			LOG_ERR("gb-tape: invalid byte count read, aborting...");
-			retval = -EIO;
-			break;
-		}
-
-		greybus_rx_handler(hdr.cport, (struct gb_message *)buffer);
-	}
-
-	free(buffer);
-
-error_buffer_alloc:
-	gb_tape->close(fd);
-
-	return retval;
 }
 
 int gb_notify(unsigned cport, enum gb_event event)
@@ -547,15 +408,6 @@ int gb_notify(unsigned cport, enum gb_event event)
 	}
 
 	return 0;
-}
-
-struct gb_bundle *gb_bundle_get_by_id(unsigned int bundle_id)
-{
-	if (bundle_id > manifest_get_max_bundle_id()) {
-		return NULL;
-	}
-
-	return g_bundle[bundle_id];
 }
 
 struct gb_cport_driver *gb_cport_get(uint16_t cport)

@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <errno.h>
 #include <unipro/unipro.h>
 #include <zephyr/logging/log.h>
 
@@ -7,47 +6,7 @@
 
 LOG_MODULE_REGISTER(greybus_stubs, LOG_LEVEL_INF);
 
-void wd_cancel(struct wdog_s *wd)
-{
-	(void)wd;
-	LOG_DBG("");
-}
-void wd_delete(struct wdog_s *wd)
-{
-	(void)wd;
-	LOG_DBG("");
-}
-void wd_start(struct wdog_s *wd, unsigned long delay, void (*callback)(int, uint32_t, ...),
-	      int integer, uint16_t cport)
-{
-	(void)wd;
-	LOG_DBG("");
-}
-void wd_static(struct wdog_s *wd)
-{
-	(void)wd;
-	LOG_DBG("");
-}
-
 void unipro_init(void)
-{
-	LOG_DBG("");
-}
-void unipro_init_with_event_handler(unipro_event_handler_t evt_handler)
-{
-	(void)evt_handler;
-	LOG_DBG("evt_handler: %p", evt_handler);
-}
-void unipro_deinit(void)
-{
-	LOG_DBG("");
-}
-void unipro_set_event_handler(unipro_event_handler_t evt_handler)
-{
-	(void)evt_handler;
-	LOG_DBG("evt_handler: %p", evt_handler);
-}
-void unipro_info(void)
 {
 	LOG_DBG("");
 }
@@ -79,25 +38,6 @@ int unipro_reset_cport(unsigned int cportid, cport_reset_completion_cb_t cb, voi
 	return -ENOSYS;
 }
 
-int unipro_set_max_inflight_rxbuf_count(unsigned int cportid, size_t max_inflight_buf)
-{
-	(void)cportid;
-	(void)max_inflight_buf;
-	LOG_DBG("cportid: %u max_inflight_buf: %zu", cportid, max_inflight_buf);
-	return -ENOSYS;
-}
-void *unipro_rxbuf_alloc(unsigned int cportid)
-{
-	(void)cportid;
-	LOG_DBG("cportid: %u", cportid);
-	return NULL;
-}
-void unipro_rxbuf_free(unsigned int cportid, void *ptr)
-{
-	(void)cportid;
-	LOG_DBG("cportid: %u ptr: %p", cportid, ptr);
-	(void)ptr;
-}
 int unipro_attr_access(uint16_t attr, uint32_t *val, uint16_t selector, int peer, int write)
 {
 	(void)attr;
@@ -131,11 +71,5 @@ void timesync_authoritative()
 {
 }
 void timesync_get_last_event()
-{
-}
-void gb_loopback_log_exit()
-{
-}
-void gb_loopback_log_entry()
 {
 }

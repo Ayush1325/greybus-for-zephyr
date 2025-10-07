@@ -34,7 +34,6 @@
 #include <zephyr/device.h>
 #include <zephyr/device_sdio.h>
 #include <greybus/greybus.h>
-#include <apps/greybus-utils/utils.h>
 
 #include <zephyr/sys/byteorder.h>
 

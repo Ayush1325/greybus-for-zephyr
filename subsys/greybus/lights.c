@@ -34,7 +34,6 @@
 #include <zephyr/device.h>
 #include <zephyr/device_lights.h>
 #include <greybus/greybus.h>
-#include <apps/greybus-utils/utils.h>
 #include <zephyr/sys/byteorder.h>
 
 #include "lights-gb.h"

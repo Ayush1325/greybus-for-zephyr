@@ -34,7 +34,6 @@
 #include <greybus/platform.h>
 #include <stdlib.h>
 #include <string.h>
-#include <greybus-utils/utils.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>

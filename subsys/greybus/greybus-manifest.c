@@ -32,13 +32,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <errno.h>
 #include <limits.h>
 #include <zephyr/sys/dlist.h>
+#include "greybus-utils/manifest.h"
 
 #include <zephyr/sys/byteorder.h>
-#include <greybus-utils/utils.h>
-// #include <nuttx/util.h>
 
 #if defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) || defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) ||        \
 	defined(CONFIG_BOARD_NRF52_BSIM)
