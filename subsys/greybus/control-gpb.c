@@ -44,7 +44,7 @@ LOG_MODULE_REGISTER(greybus_control, CONFIG_GREYBUS_LOG_LEVEL);
 
 #include "control-gb.h"
 
-static uint8_t gb_control_protocol_version(uint16_t cport, struct gb_message *req)
+static void gb_control_protocol_version(uint16_t cport, struct gb_message *req)
 {
 	const struct gb_control_proto_version_response resp_data = {
 		.major = GB_CONTROL_VERSION_MAJOR,

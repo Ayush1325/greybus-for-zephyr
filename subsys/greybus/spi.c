@@ -410,7 +410,6 @@ freemsg:
 
 freebufs:
 	free(tx_buf);
-	free(rx_buf);
 
 out:
 	gb_transport_message_empty_response_send(req, errcode, cport);
