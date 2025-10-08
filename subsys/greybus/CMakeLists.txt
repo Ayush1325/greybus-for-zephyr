@@ -9,7 +9,6 @@ zephyr_library()
 zephyr_library_sources(
   greybus-stubs.c
   greybus-core.c
-  greybus-manifest.c
   greybus_messages.c
   greybus_transport.c
   greybus_cport.c

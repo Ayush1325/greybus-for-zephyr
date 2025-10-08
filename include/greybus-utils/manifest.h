@@ -44,6 +44,5 @@
 
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
 void enable_cports(void);
-size_t manifest_get_num_cports(void);
 
 #endif
