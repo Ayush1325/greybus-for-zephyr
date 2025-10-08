@@ -70,12 +70,6 @@ struct gb_transport_backend {
 	int (*send)(uint16_t cport, const struct gb_message *msg);
 };
 
-struct gb_bundle {
-	int id;                   /* bundle ID */
-	unsigned int cport_start; /* start cport */
-	void *priv;               /* private bundle data */
-};
-
 struct gb_driver;
 
 typedef void (*gb_operation_handler_t)(struct gb_driver *drv, struct gb_message *msg, uint16_t cport);
