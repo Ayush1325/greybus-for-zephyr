@@ -273,8 +273,6 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 		bundle = g_bundle[bundle_id];
 	}
 
-	driver->bundle = bundle;
-
 	if (driver->init) {
 		retval = driver->init(cport, bundle);
 		if (retval) {

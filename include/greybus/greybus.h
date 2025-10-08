@@ -101,8 +101,6 @@ struct gb_driver {
 	gb_operation_handler_t op_handler;
 
 	const char *name;
-
-	struct gb_bundle *bundle;
 };
 
 struct gb_operation_hdr {
