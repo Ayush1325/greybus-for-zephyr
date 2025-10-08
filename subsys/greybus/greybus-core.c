@@ -158,12 +158,6 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 		.msg = msg,
 	};
 
-	if (cport >= GREYBUS_CPORT_COUNT) {
-		LOG_ERR("Invalid cport number: %u", cport);
-		gb_message_dealloc(msg);
-		return -EINVAL;
-	}
-
 	drv = gb_cport_get_new(cport)->driver;
 	if (!drv || !drv->op_handler) {
 		LOG_ERR("Cport %u does not have a valid driver registered", cport);
@@ -179,14 +173,8 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 
 int gb_unregister_driver(unsigned int cport)
 {
-	struct gb_cport_new *cport_ptr;
-
-	if (cport >= GREYBUS_CPORT_COUNT || !transport_backend) {
-		return -EINVAL;
-	}
-
-	cport_ptr = gb_cport_get_new(cport);
-	if (!cport_ptr->driver) {
+	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
+	if (!cport_ptr || !cport_ptr->driver) {
 		return -EINVAL;
 	}
 
@@ -209,17 +197,17 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 
 	LOG_DBG("Registering Greybus driver on CP%u", cport);
 
-	if (cport >= GREYBUS_CPORT_COUNT) {
-		LOG_ERR("Invalid cport number %u", cport);
-		return -EINVAL;
-	}
-
 	if (!driver) {
 		LOG_ERR("No driver to register");
 		return -EINVAL;
 	}
 
 	cport_ptr = gb_cport_get_new(cport);
+	if (!cport_ptr) {
+		LOG_ERR("Invalid cport number %u", cport);
+		return -EINVAL;
+	}
+
 	if (cport_ptr->driver) {
 		LOG_ERR("%s is already registered for CP%u", gb_driver_name(cport_ptr->driver),
 			cport);
@@ -246,18 +234,17 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 
 int gb_listen(unsigned int cport)
 {
-	struct gb_driver *drv;
+	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
 
 	DEBUGASSERT(transport_backend);
 	DEBUGASSERT(transport_backend->listen);
 
-	if (cport >= GREYBUS_CPORT_COUNT) {
+	if (!cport_ptr) {
 		LOG_ERR("Invalid cport number %u", cport);
 		return -EINVAL;
 	}
 
-	drv = gb_cport_get_new(cport)->driver;
-	if (!drv) {
+	if (!cport_ptr->driver) {
 		LOG_ERR("No driver registered! Can not connect CP%u.", cport);
 		return -EINVAL;
 	}
@@ -267,18 +254,17 @@ int gb_listen(unsigned int cport)
 
 int gb_stop_listening(unsigned int cport)
 {
-	struct gb_driver *drv;
+	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
 
 	DEBUGASSERT(transport_backend);
 	DEBUGASSERT(transport_backend->stop_listening);
 
-	if (cport >= GREYBUS_CPORT_COUNT) {
+	if (!cport_ptr) {
 		LOG_ERR("Invalid cport number %u", cport);
 		return -EINVAL;
 	}
 
-	drv = gb_cport_get_new(cport)->driver;
-	if (!drv) {
+	if (!cport_ptr->driver) {
 		LOG_ERR("No driver registered! Can not disconnect CP%u.", cport);
 		return -EINVAL;
 	}
@@ -324,27 +310,26 @@ void gb_deinit(void)
 
 int gb_notify(unsigned cport, enum gb_event event)
 {
-	struct gb_driver *drv;
+	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
 
-	if (cport >= GREYBUS_CPORT_COUNT) {
+	if (!cport_ptr) {
 		return -EINVAL;
 	}
 
-	drv = gb_cport_get_new(cport)->driver;
-	if (!drv) {
+	if (!cport_ptr->driver) {
 		return -ENOTCONN;
 	}
 
 	switch (event) {
 	case GB_EVT_CONNECTED:
-		if (drv->connected) {
-			drv->connected(cport);
+		if (cport_ptr->driver->connected) {
+			cport_ptr->driver->connected(cport);
 		}
 		break;
 
 	case GB_EVT_DISCONNECTED:
-		if (drv->disconnected) {
-			drv->disconnected(cport);
+		if (cport_ptr->driver->disconnected) {
+			cport_ptr->driver->disconnected(cport);
 		}
 		break;
 
