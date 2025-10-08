@@ -7,7 +7,6 @@
  */
 
 #include "greybus_transport.h"
-#include "greybus_cport.h"
 #include "greybus/greybus.h"
 #include <zephyr/logging/log.h>
 
@@ -16,12 +15,7 @@ LOG_MODULE_REGISTER(greybus_transport_common, CONFIG_GREYBUS_LOG_LEVEL);
 int gb_transport_message_send(const struct gb_message *msg, uint16_t cport)
 {
 	int retval;
-	struct gb_cport_driver *g_cport = gb_cport_get(cport);
 	struct gb_transport_backend *transport_backend = gb_transport_get();
-
-	if (g_cport->exit_worker) {
-		return -ENETDOWN;
-	}
 
 	retval = transport_backend->send(cport, msg);
 	if (retval) {

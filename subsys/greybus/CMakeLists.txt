@@ -12,6 +12,7 @@ zephyr_library_sources(
   greybus-manifest.c
   greybus_messages.c
   greybus_transport.c
+  greybus_cport.c
   platform/manifest.c
   platform/platform.c
   platform/service.c

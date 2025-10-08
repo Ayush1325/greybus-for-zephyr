@@ -8,6 +8,7 @@
 #include <zephyr/sys/byteorder.h>
 #include <greybus-utils/manifest.h>
 #include "../greybus-manifest.h"
+#include "../greybus_cport.h"
 
 struct greybus_manifest_cport {
 	uint8_t bundle;
@@ -39,32 +40,12 @@ struct greybus_manifest_cport {
 #define _GREYBUS_MANIFEST_BUNDLES_SIZE(n) (GREYBUS_MANIFEST_BUNDLE_SIZE * n)
 #define _GREYBUS_MANIFEST_CPORTS_SIZE(n)  (GREYBUS_MANIFEST_CPORT_SIZE * n)
 
-#define GREYBUS_MANFIEST_CPORT(_bundle, _protocol)                                                 \
-	{                                                                                          \
-		.bundle = _bundle,                                                                 \
-		.protocol = _protocol,                                                             \
-	},
-
-#define GREYBUS_CREATE_CPORT_FROM_PROP(_node_id, _bundle)                                          \
-	GREYBUS_MANFIEST_CPORT(_bundle, DT_PROP(_node_id, cport_protocol))
-
-#define GREYBUS_CPORT_IN_BUNDLE_HANDLER(_node_id)                                                  \
-	DT_FOREACH_CHILD_STATUS_OKAY_VARGS(_node_id, GREYBUS_CREATE_CPORT_FROM_PROP,               \
-					   DT_PROP(_node_id, id))
-
-#define GREYBUS_CPORT_HANDLER(_node_id)                                                            \
-	IF_ENABLED(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle),                            \
-		   (GREYBUS_CPORT_IN_BUNDLE_HANDLER(_node_id)))
-
 #define GREYBUS_BUNDLE_HANDLER(node_id)                                                            \
 	IF_ENABLED(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle),                             \
 		   (DT_PROP(node_id, bundle_class), ))
 
 static uint8_t bundles[] = {
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_BUNDLE_HANDLER)};
-
-static struct greybus_manifest_cport cports[GREYBUS_CPORT_COUNT] = {
-	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_CPORT_HANDLER)};
 
 #define GREYBUS_MANIFEST_SIZE                                                                      \
 	(sizeof(struct greybus_manifest_header) + GREYBUS_MANIFEST_INTERFACE_SIZE +                \
@@ -146,6 +127,7 @@ static int manifest_create(uint8_t buf[], size_t len)
 	int ret, i;
 	struct greybus_manifest *mnfb;
 	struct greybus_descriptor *desc;
+	struct gb_cport_new *cport;
 
 	if (len < manifest_size()) {
 		return -E2BIG;
@@ -170,9 +152,11 @@ static int manifest_create(uint8_t buf[], size_t len)
 		ret = set_greybus_bundle(desc, i, bundles[i]);
 	}
 
-	for (i = 0; i < ARRAY_SIZE(cports); ++i) {
+	for (i = 0; i < GREYBUS_CPORT_COUNT; ++i) {
+		cport = gb_cport_get_new(i);
 		desc = (struct greybus_descriptor *)((uint8_t *)desc + ret);
-		ret = set_greybus_cport(desc, i, cports[i].bundle, cports[i].protocol);
+
+		ret = set_greybus_cport(desc, i, cport->bundle, cport->protocol);
 	}
 
 	return manifest_size();
