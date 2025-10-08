@@ -74,7 +74,6 @@ LOG_MODULE_REGISTER(greybus, CONFIG_GREYBUS_LOG_LEVEL);
 
 static unsigned int cport_count;
 static struct gb_cport_driver *g_cport;
-static struct gb_bundle **g_bundle;
 static struct gb_transport_backend *transport_backend;
 
 K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), 10, 1);
@@ -207,7 +206,7 @@ int gb_unregister_driver(unsigned int cport)
 	g_cport[cport].exit_worker = true;
 
 	if (g_cport[cport].driver->exit) {
-		g_cport[cport].driver->exit(cport, g_cport[cport].driver->bundle);
+		g_cport[cport].driver->exit(cport);
 	}
 	g_cport[cport].driver = NULL;
 
@@ -216,10 +215,8 @@ int gb_unregister_driver(unsigned int cport)
 
 int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *driver)
 {
-	struct gb_bundle *bundle;
 	char thread_name[CONFIG_THREAD_MAX_NAME_LEN];
 	int retval;
-	size_t num_cports = manifest_get_num_cports_bundle(bundle_id);
 
 	LOG_DBG("Registering Greybus driver on CP%u", cport);
 
@@ -249,34 +246,8 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 		return -EINVAL;
 	}
 
-	if (bundle_id >= 0 && !g_bundle[bundle_id]) {
-		/*
-		 * TODO We should probably add a mechanism to destroy the bundle
-		 * objects allocated here, but since for now we don't really use any
-		 * actual shutdown procedure we'll leave it as a TODO.
-		 *
-		 * Eventually we'd need some reference counting mechanism, because we
-		 * call _gb_register_driver() once per used cport. We would need to
-		 * know when when there are no more cports referencing given bundle
-		 * and it's safe to free it.
-		 */
-		bundle = calloc(1, sizeof(struct gb_bundle));
-		if (!bundle) {
-			return -ENOMEM;
-		}
-
-		bundle->id = bundle_id;
-		bundle->cport_start = manifest_get_start_cport_bundle(bundle_id);
-		bundle->dev = calloc(1, num_cports * sizeof(struct device *));
-		g_bundle[bundle_id] = bundle;
-	} else {
-		bundle = g_bundle[bundle_id];
-	}
-
-	driver->bundle = bundle;
-
 	if (driver->init) {
-		retval = driver->init(cport, bundle);
+		retval = driver->init(cport);
 		if (retval) {
 			LOG_ERR("Can not init %s", gb_driver_name(driver));
 			return retval;
@@ -330,21 +301,13 @@ int gb_stop_listening(unsigned int cport)
 
 int gb_init(struct gb_transport_backend *transport)
 {
-	size_t num_bundles = manifest_get_max_bundle_id() + 1;
-
 	if (!transport) {
 		return -EINVAL;
-	}
-
-	g_bundle = calloc(1, sizeof(struct gb_bundle *) * num_bundles);
-	if (!g_bundle) {
-		return -ENOMEM;
 	}
 
 	cport_count = unipro_cport_count();
 	g_cport = calloc(1, sizeof(struct gb_cport_driver) * cport_count);
 	if (!g_cport) {
-		free(g_bundle);
 		return -ENOMEM;
 	}
 

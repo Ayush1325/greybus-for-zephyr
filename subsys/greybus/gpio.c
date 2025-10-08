@@ -391,26 +391,7 @@ static void gb_gpio_handler(struct gb_driver *drv, struct gb_message *msg, uint1
 	}
 }
 
-static int gb_gpio_init(unsigned int cport, struct gb_bundle *bundle)
-{
-	unsigned int cport_idx = cport - bundle->cport_start;
-
-	bundle->dev[cport_idx] = (struct device *)gb_cport_to_device(cport);
-	if (!bundle->dev[cport_idx]) {
-		return -EIO;
-	}
-	return 0;
-}
-
-static void gb_gpio_exit(unsigned int cport, struct gb_bundle *bundle)
-{
-	ARG_UNUSED(cport);
-	ARG_UNUSED(bundle);
-}
-
 struct gb_driver gpio_driver = {
-	.init = gb_gpio_init,
-	.exit = gb_gpio_exit,
 	.op_handler = gb_gpio_handler,
 };
 

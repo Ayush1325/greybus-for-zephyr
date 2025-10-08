@@ -7,6 +7,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <greybus-utils/manifest.h>
+#include "../greybus-manifest.h"
 
 struct greybus_manifest_cport {
 	uint8_t bundle;
@@ -69,10 +70,10 @@ static struct greybus_manifest_cport cports[GREYBUS_CPORT_COUNT] = {
 	(sizeof(struct greybus_manifest_header) + GREYBUS_MANIFEST_INTERFACE_SIZE +                \
 	 GREYBUS_MANIFEST_STRING_SIZE(CONFIG_GREYBUS_VENDOR_STRING) +                              \
 	 GREYBUS_MANIFEST_STRING_SIZE(CONFIG_GREYBUS_PRODUCT_STRING) +                             \
-	 _GREYBUS_MANIFEST_CPORTS_SIZE(GREYBUS_CPORT_COUNT) +                                       \
+	 _GREYBUS_MANIFEST_CPORTS_SIZE(GREYBUS_CPORT_COUNT) +                                      \
 	 _GREYBUS_MANIFEST_BUNDLES_SIZE(ARRAY_SIZE(bundles)))
 
-#include "../greybus-manifest.h"
+static unsigned char greybus_manifest_builtin[GREYBUS_MANIFEST_SIZE];
 
 size_t manifest_size(void)
 {
@@ -179,8 +180,6 @@ static int manifest_create(uint8_t buf[], size_t len)
 
 uint8_t *manifest_get(void)
 {
-	static unsigned char greybus_manifest_builtin[GREYBUS_MANIFEST_SIZE];
-
 	manifest_create(greybus_manifest_builtin, GREYBUS_MANIFEST_SIZE);
 
 	if (IS_ENABLED(CONFIG_GREYBUS_MANIFEST_BUILTIN)) {
