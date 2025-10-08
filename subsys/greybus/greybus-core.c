@@ -241,11 +241,6 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 		return -EINVAL;
 	}
 
-	if (bundle_id >= 0 && bundle_id > manifest_get_max_bundle_id()) {
-		LOG_ERR("invalid bundle_id: %d", bundle_id);
-		return -EINVAL;
-	}
-
 	if (driver->init) {
 		retval = driver->init(cport);
 		if (retval) {

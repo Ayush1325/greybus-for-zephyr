@@ -44,22 +44,14 @@
 
 struct gb_cport {
 	sys_dnode_t node;
-	int id;
-	int bundle;
-	int protocol;
+	uint16_t id;
+	uint8_t bundle;
+	uint8_t protocol;
 };
 
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
 void enable_cports(void);
 bool manifest_parse(void *data, size_t size);
-bool manifest_patch(uint8_t **mnfb, void *data, size_t size);
-void parse_manifest_blob(void *manifest);
-void enable_manifest(char *name, void *manifest, int device_id);
-void disable_manifest(char *name, void *priv, int device_id);
-void release_manifest_blob(void *manifest);
-sys_dlist_t *get_manifest_cports(void);
-size_t manifest_get_max_bundle_id(void);
 size_t manifest_get_num_cports(void);
-size_t manifest_get_num_cports_bundle(int bundle_id);
 
 #endif
