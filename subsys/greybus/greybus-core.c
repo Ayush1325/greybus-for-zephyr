@@ -119,7 +119,7 @@ uint8_t gb_errno_to_op_result(int err)
 
 static void gb_process_msg(struct gb_message *msg, uint16_t cport)
 {
-	struct gb_driver *drv = gb_cport_get_new(cport)->driver;
+	struct gb_driver *drv = gb_cport_get(cport)->driver;
 
 	if (gb_message_type(msg) == GB_PING_TYPE) {
 		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
@@ -158,7 +158,7 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 		.msg = msg,
 	};
 
-	drv = gb_cport_get_new(cport)->driver;
+	drv = gb_cport_get(cport)->driver;
 	if (!drv || !drv->op_handler) {
 		LOG_ERR("Cport %u does not have a valid driver registered", cport);
 		gb_message_dealloc(msg);
@@ -173,7 +173,7 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 
 int gb_unregister_driver(unsigned int cport)
 {
-	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
+	struct gb_cport *cport_ptr = gb_cport_get(cport);
 	if (!cport_ptr || !cport_ptr->driver) {
 		return -EINVAL;
 	}
@@ -192,7 +192,7 @@ int gb_unregister_driver(unsigned int cport)
 
 int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *driver)
 {
-	struct gb_cport_new *cport_ptr;
+	struct gb_cport *cport_ptr;
 	int retval;
 
 	LOG_DBG("Registering Greybus driver on CP%u", cport);
@@ -202,7 +202,7 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 		return -EINVAL;
 	}
 
-	cport_ptr = gb_cport_get_new(cport);
+	cport_ptr = gb_cport_get(cport);
 	if (!cport_ptr) {
 		LOG_ERR("Invalid cport number %u", cport);
 		return -EINVAL;
@@ -234,7 +234,7 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 
 int gb_listen(unsigned int cport)
 {
-	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
+	struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	DEBUGASSERT(transport_backend);
 	DEBUGASSERT(transport_backend->listen);
@@ -254,7 +254,7 @@ int gb_listen(unsigned int cport)
 
 int gb_stop_listening(unsigned int cport)
 {
-	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
+	struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	DEBUGASSERT(transport_backend);
 	DEBUGASSERT(transport_backend->stop_listening);
@@ -310,7 +310,7 @@ void gb_deinit(void)
 
 int gb_notify(unsigned cport, enum gb_event event)
 {
-	struct gb_cport_new *cport_ptr = gb_cport_get_new(cport);
+	struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	if (!cport_ptr) {
 		return -EINVAL;

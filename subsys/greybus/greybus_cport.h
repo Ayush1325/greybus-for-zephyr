@@ -9,12 +9,12 @@
 
 #include <greybus/greybus.h>
 
-struct gb_cport_new {
+struct gb_cport {
 	struct gb_driver *driver;
 	uint8_t bundle;
 	uint8_t protocol;
 };
 
-struct gb_cport_new *gb_cport_get_new(uint16_t cport);
+struct gb_cport *gb_cport_get(uint16_t cport);
 
 #endif // _GREYBUS_CPORT_H_

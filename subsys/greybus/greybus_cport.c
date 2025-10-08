@@ -28,10 +28,10 @@ LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 	IF_ENABLED(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle),                            \
 		   (GREYBUS_CPORT_IN_BUNDLE_HANDLER(_node_id)))
 
-static struct gb_cport_new cports[GREYBUS_CPORT_COUNT] = {
+static struct gb_cport cports[GREYBUS_CPORT_COUNT] = {
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_CPORT_HANDLER)};
 
-struct gb_cport_new *gb_cport_get_new(uint16_t cport)
+struct gb_cport *gb_cport_get(uint16_t cport)
 {
 	return (cport >= GREYBUS_CPORT_COUNT) ? NULL : &cports[cport];
 }

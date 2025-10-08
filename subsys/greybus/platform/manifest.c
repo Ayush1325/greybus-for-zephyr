@@ -125,7 +125,7 @@ int manifest_create(uint8_t buf[], size_t len)
 	int ret, i;
 	struct greybus_manifest *mnfb;
 	struct greybus_descriptor *desc;
-	struct gb_cport_new *cport;
+	struct gb_cport *cport;
 
 	if (len < manifest_size()) {
 		return -E2BIG;
@@ -151,7 +151,7 @@ int manifest_create(uint8_t buf[], size_t len)
 	}
 
 	for (i = 0; i < GREYBUS_CPORT_COUNT; ++i) {
-		cport = gb_cport_get_new(i);
+		cport = gb_cport_get(i);
 		desc = (struct greybus_descriptor *)((uint8_t *)desc + ret);
 
 		ret = set_greybus_cport(desc, i, cport->bundle, cport->protocol);
