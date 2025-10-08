@@ -156,19 +156,6 @@ free_requests:
 	return gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static int gb_i2c_init(unsigned int cport, struct gb_bundle *bundle)
-{
-	unsigned int cport_idx = cport - bundle->cport_start;
-	__ASSERT_NO_MSG(bundle != NULL);
-
-	bundle->dev[cport_idx] = (struct device *)gb_cport_to_device(cport);
-	if (!bundle->dev[cport_idx]) {
-		return -EIO;
-	}
-
-	return 0;
-}
-
 static void gb_i2c_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
 {
 	switch (gb_message_type(msg)) {
@@ -185,7 +172,6 @@ static void gb_i2c_handler(struct gb_driver *drv, struct gb_message *msg, uint16
 }
 
 static struct gb_driver gb_i2c_driver = {
-	.init = gb_i2c_init,
 	.op_handler = gb_i2c_handler,
 };
 

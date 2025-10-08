@@ -274,7 +274,7 @@ int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *dri
 	}
 
 	if (driver->init) {
-		retval = driver->init(cport, bundle);
+		retval = driver->init(cport);
 		if (retval) {
 			LOG_ERR("Can not init %s", gb_driver_name(driver));
 			return retval;

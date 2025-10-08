@@ -414,24 +414,6 @@ out:
 	gb_transport_message_empty_response_send(req, errcode, cport);
 }
 
-/**
- * @brief Greybus SPI protocol initialize function
- *
- * @param cport CPort number
- * @param bundle Greybus bundle handle
- * @return 0 on success, negative errno on error
- */
-static int gb_spi_init(unsigned int cport, struct gb_bundle *bundle)
-{
-	unsigned int cport_idx = cport - bundle->cport_start;
-
-	bundle->dev[cport_idx] = (struct device *)gb_cport_to_device(cport);
-	if (!bundle->dev[cport_idx]) {
-		return -EIO;
-	}
-	return 0;
-}
-
 static void gb_spi_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
 {
 	const struct device *dev = gb_cport_to_device(cport);
@@ -452,7 +434,6 @@ static void gb_spi_handler(struct gb_driver *drv, struct gb_message *msg, uint16
 }
 
 static struct gb_driver gb_spi_driver = {
-	.init = gb_spi_init,
 	.op_handler = gb_spi_handler,
 };
 
