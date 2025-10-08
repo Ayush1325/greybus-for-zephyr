@@ -54,8 +54,6 @@ static uint8_t bundles[] = {
 	 _GREYBUS_MANIFEST_CPORTS_SIZE(GREYBUS_CPORT_COUNT) +                                      \
 	 _GREYBUS_MANIFEST_BUNDLES_SIZE(ARRAY_SIZE(bundles)))
 
-static unsigned char greybus_manifest_builtin[GREYBUS_MANIFEST_SIZE];
-
 size_t manifest_size(void)
 {
 	return GREYBUS_MANIFEST_SIZE;
@@ -122,7 +120,7 @@ static int set_greybus_cport(struct greybus_descriptor *desc, uint8_t id, uint8_
 	return GREYBUS_MANIFEST_CPORT_SIZE;
 }
 
-static int manifest_create(uint8_t buf[], size_t len)
+int manifest_create(uint8_t buf[], size_t len)
 {
 	int ret, i;
 	struct greybus_manifest *mnfb;
@@ -160,15 +158,4 @@ static int manifest_create(uint8_t buf[], size_t len)
 	}
 
 	return manifest_size();
-}
-
-uint8_t *manifest_get(void)
-{
-	manifest_create(greybus_manifest_builtin, GREYBUS_MANIFEST_SIZE);
-
-	if (IS_ENABLED(CONFIG_GREYBUS_MANIFEST_BUILTIN)) {
-		return (uint8_t *)greybus_manifest_builtin;
-	}
-
-	return NULL;
 }

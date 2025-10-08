@@ -42,16 +42,8 @@
 #define GREYBUS_CPORT_COUNT                                                                        \
 	(DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
 
-struct gb_cport {
-	sys_dnode_t node;
-	uint16_t id;
-	uint8_t bundle;
-	uint8_t protocol;
-};
-
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
 void enable_cports(void);
-bool manifest_parse(void *data, size_t size);
 size_t manifest_get_num_cports(void);
 
 #endif

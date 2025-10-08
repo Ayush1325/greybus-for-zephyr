@@ -54,18 +54,6 @@ static int greybus_service_init(void)
 	}
 	LOG_DBG("Greybus initializing..");
 
-	mnfb = manifest_get();
-	if (!mnfb) {
-		LOG_ERR("failed to get mnfb");
-		return -ENOENT;
-	}
-
-	r = manifest_parse(mnfb, manifest_size());
-	if (r != true) {
-		LOG_ERR("failed to parse mnfb");
-		return -EINVAL;
-	}
-
 	num_cports = manifest_get_num_cports();
 	if (num_cports == 0) {
 		LOG_ERR("no cports are defined");
