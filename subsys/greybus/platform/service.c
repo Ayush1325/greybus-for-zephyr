@@ -78,8 +78,6 @@ static int greybus_service_init(void)
 		return -EIO;
 	}
 
-	set_manifest_blob(mnfb);
-
 	r = gb_init((struct gb_transport_backend *)xport);
 	if (r < 0) {
 		LOG_ERR("gb_init() failed: %d", r);
@@ -91,7 +89,6 @@ static int greybus_service_init(void)
 	return 0;
 
 clear_mnfb:
-	set_manifest_blob(NULL);
 	return r;
 }
 

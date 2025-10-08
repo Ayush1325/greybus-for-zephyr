@@ -35,6 +35,7 @@
 #include <limits.h>
 #include <zephyr/sys/dlist.h>
 #include "greybus-utils/manifest.h"
+#include "platform/manifest.h"
 
 #include <zephyr/sys/byteorder.h>
 
@@ -96,8 +97,6 @@ static struct greybus g_greybus = {
 	.max_patch_device_id = 0,
 	.max_patch_string_id = 0,
 };
-
-static unsigned char *bridge_manifest;
 
 static void *alloc_cport(void)
 {
@@ -550,16 +549,6 @@ static int get_interface_id(char *fname)
 	return iid;
 }
 
-void *get_manifest_blob(void)
-{
-	return bridge_manifest;
-}
-
-void set_manifest_blob(void *blob)
-{
-	bridge_manifest = blob;
-}
-
 void parse_manifest_blob(void *manifest)
 {
 	struct greybus_manifest_header *mh = manifest;
@@ -577,7 +566,7 @@ void release_manifest_blob(void *manifest)
 void enable_manifest(char *name, void *manifest, int device_id)
 {
 	if (!manifest) {
-		manifest = get_manifest_blob();
+		manifest = manifest_get();
 	}
 
 	if (manifest) {
@@ -597,7 +586,7 @@ void disable_manifest(char *name, void *priv, int device_id)
 {
 	void *manifest;
 
-	manifest = get_manifest_blob();
+	manifest = manifest_get();
 	if (manifest) {
 		release_manifest_blob(manifest);
 	}
@@ -626,27 +615,6 @@ size_t manifest_get_num_cports_bundle(int bundle_id)
 	}
 
 	return r;
-}
-
-unsigned int manifest_get_start_cport_bundle(int bundle_id)
-{
-	struct gb_cport *gb_cport;
-	unsigned int cport_id = UINT_MAX;
-
-	SYS_DLIST_FOR_EACH_CONTAINER(&g_greybus.cports, gb_cport, node) {
-		if (gb_cport->bundle == bundle_id && gb_cport->id < cport_id) {
-			cport_id = gb_cport->id;
-		}
-	}
-
-	return cport_id;
-}
-
-int get_manifest_size(void)
-{
-	struct greybus_manifest_header *mh = get_manifest_blob();
-
-	return mh ? sys_le16_to_cpu(mh->size) : 0;
 }
 
 size_t manifest_get_max_bundle_id(void)
