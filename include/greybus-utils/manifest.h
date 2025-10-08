@@ -31,6 +31,16 @@
 
 #include <zephyr/sys/dlist.h>
 #include <zephyr/types.h>
+#include <zephyr/devicetree.h>
+
+#define _GREYBUS_BASE_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_greybus)
+
+#define _GREYBUS_CPORT_COUNTER(_node_id)                                                           \
+	COND_CODE_1(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle),                            \
+		   (DT_CHILD_NUM_STATUS_OKAY(_node_id)), (0))
+
+#define GREYBUS_CPORT_COUNT                                                                        \
+	DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+))
 
 struct gb_cport {
 	sys_dnode_t node;

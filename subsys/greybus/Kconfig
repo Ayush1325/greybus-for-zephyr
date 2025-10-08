@@ -11,6 +11,22 @@ menuconfig GREYBUS
 
 if GREYBUS
 
+config GREYBUS_VENDOR_STRING
+	string "Greybus Vendor String"
+	default "Zephyr Project RTOS"
+
+config GREYBUS_PRODUCT_STRING
+	string "Greybus Product String"
+	default "Greybus Service Sample Application"
+
+config GREYBUS_VERSION_MAJOR
+	int
+	default 0
+
+config GREYBUS_VERSION_MINOR
+	int
+	default 1
+
 config GREYBUS_MESSAGES_HEAP_MEM_POOL_SIZE
 	int "Heap for Greybus messages"
 	default 2048
