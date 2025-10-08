@@ -169,12 +169,6 @@ static int gb_i2c_init(unsigned int cport, struct gb_bundle *bundle)
 	return 0;
 }
 
-static void gb_i2c_exit(unsigned int cport, struct gb_bundle *bundle)
-{
-	ARG_UNUSED(cport);
-	ARG_UNUSED(bundle);
-}
-
 static void gb_i2c_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
 {
 	switch (gb_message_type(msg)) {
@@ -192,7 +186,6 @@ static void gb_i2c_handler(struct gb_driver *drv, struct gb_message *msg, uint16
 
 static struct gb_driver gb_i2c_driver = {
 	.init = gb_i2c_init,
-	.exit = gb_i2c_exit,
 	.op_handler = gb_i2c_handler,
 };
 

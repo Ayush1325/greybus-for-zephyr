@@ -94,7 +94,7 @@ struct gb_driver {
 	 * This function is called upon driver deregistration. All private data
 	 * stored in bundle should be freed and struct device should be closed.
 	 */
-	void (*exit)(unsigned int cport, struct gb_bundle *bundle);
+	void (*exit)(unsigned int cport);
 	void (*connected)(unsigned int cport);
 	void (*disconnected)(unsigned int cport);
 

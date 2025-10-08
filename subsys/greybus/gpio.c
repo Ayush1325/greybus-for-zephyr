@@ -402,15 +402,8 @@ static int gb_gpio_init(unsigned int cport, struct gb_bundle *bundle)
 	return 0;
 }
 
-static void gb_gpio_exit(unsigned int cport, struct gb_bundle *bundle)
-{
-	ARG_UNUSED(cport);
-	ARG_UNUSED(bundle);
-}
-
 struct gb_driver gpio_driver = {
 	.init = gb_gpio_init,
-	.exit = gb_gpio_exit,
 	.op_handler = gb_gpio_handler,
 };
 

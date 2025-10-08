@@ -207,7 +207,7 @@ int gb_unregister_driver(unsigned int cport)
 	g_cport[cport].exit_worker = true;
 
 	if (g_cport[cport].driver->exit) {
-		g_cport[cport].driver->exit(cport, g_cport[cport].driver->bundle);
+		g_cport[cport].driver->exit(cport);
 	}
 	g_cport[cport].driver = NULL;
 
