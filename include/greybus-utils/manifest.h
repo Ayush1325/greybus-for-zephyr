@@ -42,29 +42,7 @@
 #define GREYBUS_CPORT_COUNT                                                                        \
 	(DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
 
-struct gb_cport {
-	sys_dnode_t node;
-	int id;
-	int bundle;
-	int protocol;
-};
-
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
-void foreach_manifest(manifest_handler handler);
 void enable_cports(void);
-void *get_manifest_blob(void);
-void set_manifest_blob(void *blob);
-bool manifest_parse(void *data, size_t size);
-bool manifest_patch(uint8_t **mnfb, void *data, size_t size);
-void parse_manifest_blob(void *manifest);
-void enable_manifest(char *name, void *manifest, int device_id);
-void disable_manifest(char *name, void *priv, int device_id);
-void release_manifest_blob(void *manifest);
-sys_dlist_t *get_manifest_cports(void);
-int get_manifest_size(void);
-size_t manifest_get_max_bundle_id(void);
-size_t manifest_get_num_cports(void);
-size_t manifest_get_num_cports_bundle(int bundle_id);
-unsigned int manifest_get_start_cport_bundle(int bundle_id);
 
 #endif

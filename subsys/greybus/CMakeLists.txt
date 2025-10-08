@@ -1,7 +1,5 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
-include(../../cmake/greybus.cmake)
-
 zephyr_include_directories(../../../include)
 
 zephyr_library()
@@ -9,9 +7,9 @@ zephyr_library()
 zephyr_library_sources(
   greybus-stubs.c
   greybus-core.c
-  greybus-manifest.c
   greybus_messages.c
   greybus_transport.c
+  greybus_cport.c
   platform/manifest.c
   platform/platform.c
   platform/service.c
@@ -21,20 +19,6 @@ zephyr_library_sources(
   platform/control.c
   platform/interface.c
   platform/string.c)
-
-if(CONFIG_GREYBUS_MANIFEST_BUILTIN)
-
-  devicetree_unfixed_h_to_mnfs(
-    ${PROJECT_BINARY_DIR}/include/generated/zephyr/devicetree_generated.h
-    ${PROJECT_BINARY_DIR}/include/generated/greybus.mnfs)
-
-  mnfs_to_mnfb(${PROJECT_BINARY_DIR}/include/generated/greybus.mnfs
-               ${PROJECT_BINARY_DIR}/include/generated/greybus.mnfb)
-
-  generate_inc_file_for_target(
-    app ${PROJECT_BINARY_DIR}/include/generated/greybus.mnfb
-    ${PROJECT_BINARY_DIR}/include/generated/greybus_mnfb.inc)
-endif()
 
 if(CONFIG_GREYBUS_TLS_BUILTIN)
   set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)

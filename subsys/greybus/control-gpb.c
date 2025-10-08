@@ -29,7 +29,6 @@
  */
 
 #include <greybus/ara_version.h>
-#include <string.h>
 #include <zephyr/sys/byteorder.h>
 #include <greybus/greybus.h>
 #include <unipro/unipro.h>
@@ -38,6 +37,7 @@
 #include <greybus-utils/manifest.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
+#include "platform/manifest.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(greybus_control, CONFIG_GREYBUS_LOG_LEVEL);
@@ -57,7 +57,7 @@ static void gb_control_protocol_version(uint16_t cport, struct gb_message *req)
 static void gb_control_get_manifest_size(uint16_t cport, struct gb_message *req)
 {
 	const struct gb_control_get_manifest_size_response resp_data = {
-		.size = sys_cpu_to_le16(get_manifest_size()),
+		.size = sys_cpu_to_le16(manifest_size()),
 	};
 
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
@@ -65,8 +65,14 @@ static void gb_control_get_manifest_size(uint16_t cport, struct gb_message *req)
 
 static void gb_control_get_manifest(uint16_t cport, struct gb_message *req)
 {
-	gb_transport_message_response_success_send(req, get_manifest_blob(), get_manifest_size(),
-						   cport);
+	struct gb_message *msg = gb_message_alloc(manifest_size(), GB_RESPONSE(req->header.type),
+						  req->header.id, GB_OP_SUCCESS);
+
+	manifest_create(msg->payload, manifest_size());
+
+	gb_transport_message_send(msg, cport);
+
+	gb_message_dealloc(msg);
 }
 
 static void gb_control_connected(uint16_t cport, struct gb_message *req)
