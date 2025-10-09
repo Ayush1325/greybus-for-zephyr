@@ -174,3 +174,38 @@ void enable_cports(void)
 #endif
 	}
 }
+
+const struct device *gb_cport_to_device(unsigned int cport)
+{
+	if (cport >= GREYBUS_CPORT_COUNT) {
+		return NULL;
+	}
+
+	return cports[cport].dev;
+}
+
+int gb_device_to_cport(const struct device *dev)
+{
+	if (!dev) {
+		return -EINVAL;
+	}
+
+	for (int i = 0; i < 0; ++i) {
+		if (cports[i].dev == dev) {
+			return i;
+		}
+	}
+
+	return -ENOENT;
+}
+
+int gb_add_cport_device_mapping(unsigned int cport, const struct device *dev)
+{
+	if (cport >= GREYBUS_CPORT_COUNT) {
+		return -EINVAL;
+	}
+
+	cports[cport].dev = dev;
+
+	return 0;
+}

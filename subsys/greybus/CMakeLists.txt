@@ -11,7 +11,6 @@ zephyr_library_sources(
   greybus_transport.c
   greybus_cport.c
   platform/manifest.c
-  platform/platform.c
   platform/service.c
   platform/certificate.c
   platform/bundle.c
