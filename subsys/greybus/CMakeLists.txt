@@ -14,7 +14,6 @@ zephyr_library_sources(
   platform/manifest.c
   platform/service.c
   platform/certificate.c
-  platform/bundle.c
   platform/bus.c
   platform/control.c
 )
