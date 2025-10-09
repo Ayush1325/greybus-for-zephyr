@@ -28,12 +28,6 @@
 	version-major = <GREYBUS_VERSION_MAJOR>;
 	version-minor = <GREYBUS_VERSION_MINOR>;
 
-	gbinterface0 {
-		status = "okay";
-		compatible = "zephyr,greybus-interface";
-		greybus-interface;
-	};
-
 	gbbundle0 {
 		status = "okay";
 		compatible = "zephyr,greybus-bundle";

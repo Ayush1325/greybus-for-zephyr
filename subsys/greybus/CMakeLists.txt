@@ -17,7 +17,6 @@ zephyr_library_sources(
   platform/bundle.c
   platform/bus.c
   platform/control.c
-  platform/interface.c
 )
 
 if(CONFIG_GREYBUS_TLS_BUILTIN)
