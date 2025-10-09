@@ -24,9 +24,6 @@
 
 &greybus0 {
 	status = "okay";
-	/* defaults in effect, so this isn't necessary */
-	version-major = <GREYBUS_VERSION_MAJOR>;
-	version-minor = <GREYBUS_VERSION_MINOR>;
 
 	gbbundle0 {
 		status = "okay";
