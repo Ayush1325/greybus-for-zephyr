@@ -27,11 +27,11 @@ config GREYBUS_VERSION_MINOR
 	int
 	default 1
 
-config GREYBUS_MESSAGES_HEAP_MEM_POOL_SIZE
-	int "Heap for Greybus messages"
+config GREYBUS_HEAP_MEM_POOL_SIZE
+	int "Heap for Greybus subsystem"
 	default 2048
 	help
-	  Heap memory pre-allocated for greybus messages
+	  Heap memory pre-allocated for greybus subsystem
 
 choice
 	prompt "Greybus Manifest Source"

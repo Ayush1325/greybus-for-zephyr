@@ -26,6 +26,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "greybus_heap.h"
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <zephyr/device.h>
@@ -308,7 +309,7 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 		}
 	}
 
-	tx_buf = malloc(op_count * 2 * sizeof(*tx_buf));
+	tx_buf = gb_alloc(op_count * 2 * sizeof(*tx_buf));
 	rx_buf = &tx_buf[op_count];
 	if (tx_buf == NULL) {
 		free(tx_buf);
@@ -408,7 +409,7 @@ freemsg:
 	gb_message_dealloc(resp);
 
 freebufs:
-	free(tx_buf);
+	gb_free(tx_buf);
 
 out:
 	gb_transport_message_empty_response_send(req, errcode, cport);

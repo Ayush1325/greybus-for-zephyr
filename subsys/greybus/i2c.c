@@ -36,6 +36,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include "greybus_heap.h"
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include "i2c-gb.h"
@@ -110,7 +111,7 @@ static void gb_i2c_protocol_transfer(uint16_t cport, struct gb_message *req,
 	}
 	resp_data = (struct gb_i2c_transfer_rsp *)resp->payload;
 
-	requests = malloc(sizeof(*requests) * op_count);
+	requests = gb_alloc(sizeof(*requests) * op_count);
 	if (!requests) {
 		ret = GB_OP_NO_MEMORY;
 		goto free_msg;
@@ -151,7 +152,7 @@ static void gb_i2c_protocol_transfer(uint16_t cport, struct gb_message *req,
 free_msg:
 	gb_message_dealloc(resp);
 free_requests:
-	free(requests);
+	gb_free(requests);
 
 	return gb_transport_message_empty_response_send(req, ret, cport);
 }
