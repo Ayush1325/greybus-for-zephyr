@@ -29,6 +29,11 @@ LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 		   (GREYBUS_CPORT_IN_BUNDLE_HANDLER(_node_id)))
 
 static struct gb_cport cports[GREYBUS_CPORT_COUNT] = {
+	/* cport0 is always control cport */
+	{
+		.bundle = 0,
+		.protocol = 0,
+	},
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_CPORT_HANDLER)};
 
 struct gb_cport *gb_cport_get(uint16_t cport)

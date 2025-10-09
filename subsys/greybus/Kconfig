@@ -181,11 +181,6 @@ config GREYBUS_CAMERA
 	help
 	  Select this for Greybus Camera support.
 
-config GREYBUS_CONTROL
-	bool "Greybus Control"
-	help
-	  Select this for a Greybus Control cport.
-
 config GREYBUS_GPIO
 	bool "Greybus GPIO"
 	select GPIO_GET_DIRECTION

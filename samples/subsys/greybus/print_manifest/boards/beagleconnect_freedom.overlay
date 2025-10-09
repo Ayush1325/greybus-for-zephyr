@@ -25,32 +25,6 @@
 &greybus0 {
 	status = "okay";
 
-	gbbundle0 {
-		status = "okay";
-		compatible = "zephyr,greybus-bundle";
-		greybus-bundle;
-		/* Control Bundle 0
-		 * Note: control bundle 0 and control cport 0 are optional
-		 * Since instance numbers automatically begin at 0, the id
-		 * is a mandatory field for bundles and cports.
-		 */
-		id = <CONTROL_BUNDLE_ID>;
-		bundle-class = <BUNDLE_CLASS_CONTROL>;
-
-		gbcontrol0 {
-			status = "okay";
-			compatible = "zephyr,greybus-control";
-			greybus-controller;
-			/* Control CPort 0
-			 * Note: control bundle 0 and control cport 0 are optional
-			 * Since instance numbers automatically begin at 0, the id
-			 * is a mandatory field for bundles and cports.
-			 */
-			id = <CONTROL_CPORT_ID>;
-			cport-protocol = <CPORT_PROTOCOL_CONTROL>; 
-		};
-	};
-
 	gbbundle1 {
 		status = "okay";
 		compatible = "zephyr,greybus-bundle";

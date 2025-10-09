@@ -15,7 +15,7 @@ zephyr_library_sources(
   platform/service.c
   platform/certificate.c
   platform/bus.c
-  platform/control.c
+  control-gpb.c
 )
 
 if(CONFIG_GREYBUS_TLS_BUILTIN)
@@ -41,7 +41,6 @@ zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART
                              platform/transport-uart.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_DUMMY
                              platform/transport-dummy.c)
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_CONTROL control-gpb.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_AUDIO audio.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_CAMERA camera.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_GPIO gpio.c platform/gpio.c)

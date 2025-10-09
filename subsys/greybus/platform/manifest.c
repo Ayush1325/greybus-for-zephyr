@@ -45,7 +45,8 @@ struct greybus_manifest_cport {
 		   (DT_PROP(node_id, bundle_class), ))
 
 static uint8_t bundles[] = {
-	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_BUNDLE_HANDLER)};
+	/* cport0 is always control cport */
+	0, DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_BUNDLE_HANDLER)};
 
 #define GREYBUS_MANIFEST_SIZE                                                                      \
 	(sizeof(struct greybus_manifest_header) + GREYBUS_MANIFEST_INTERFACE_SIZE +                \
