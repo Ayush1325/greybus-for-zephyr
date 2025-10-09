@@ -444,7 +444,7 @@ static struct gb_driver gb_spi_driver = {
  * @param cport CPort number
  * @param bundle Bundle number.
  */
-void gb_spi_register(int cport, int bundle)
+void gb_spi_register(int cport)
 {
-	gb_register_driver(cport, bundle, &gb_spi_driver);
+	gb_register_driver(cport, &gb_spi_driver);
 }

@@ -391,11 +391,11 @@ static void gb_gpio_handler(struct gb_driver *drv, struct gb_message *msg, uint1
 	}
 }
 
-struct gb_driver gpio_driver = {
+static struct gb_driver gpio_driver = {
 	.op_handler = gb_gpio_handler,
 };
 
-void gb_gpio_register(int cport, int bundle)
+void gb_gpio_register(int cport)
 {
-	gb_register_driver(cport, bundle, &gpio_driver);
+	gb_register_driver(cport, &gpio_driver);
 }

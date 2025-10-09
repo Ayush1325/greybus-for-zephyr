@@ -176,7 +176,7 @@ static struct gb_driver gb_i2c_driver = {
 	.op_handler = gb_i2c_handler,
 };
 
-void gb_i2c_register(int cport, int bundle)
+void gb_i2c_register(int cport)
 {
-	gb_register_driver(cport, bundle, &gb_i2c_driver);
+	gb_register_driver(cport, &gb_i2c_driver);
 }

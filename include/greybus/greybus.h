@@ -72,7 +72,8 @@ struct gb_transport_backend {
 
 struct gb_driver;
 
-typedef void (*gb_operation_handler_t)(struct gb_driver *drv, struct gb_message *msg, uint16_t cport);
+typedef void (*gb_operation_handler_t)(struct gb_driver *drv, struct gb_message *msg,
+				       uint16_t cport);
 
 struct gb_driver {
 	/*
@@ -92,7 +93,6 @@ struct gb_driver {
 	void (*disconnected)(unsigned int cport);
 
 	gb_operation_handler_t op_handler;
-
 	const char *name;
 };
 
@@ -132,18 +132,18 @@ static inline const char *gb_driver_name(struct gb_driver *driver)
 int gb_init(struct gb_transport_backend *transport);
 void gb_deinit(void);
 int gb_unipro_init(void);
-int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *driver);
+int _gb_register_driver(unsigned int cport, struct gb_driver *driver);
 int gb_unregister_driver(unsigned int cport);
 
-static inline int gb_register_named_driver(unsigned int cport, int bundle, struct gb_driver *driver,
+static inline int gb_register_named_driver(unsigned int cport, struct gb_driver *driver,
 					   const char *name)
 {
 	driver->name = name;
-	return _gb_register_driver(cport, bundle, driver);
+	return _gb_register_driver(cport, driver);
 }
 
-#define gb_register_driver(cport, bundle, driver)                                                  \
-	gb_register_named_driver(cport, bundle, driver, __FILE__)
+#define gb_register_driver(cport, driver)                                                  \
+	gb_register_named_driver(cport, driver, __FILE__)
 int gb_listen(unsigned int cport);
 int gb_stop_listening(unsigned int cport);
 int gb_notify(unsigned cport, enum gb_event event);

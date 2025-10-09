@@ -190,7 +190,7 @@ int gb_unregister_driver(unsigned int cport)
 	return 0;
 }
 
-int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *driver)
+int _gb_register_driver(unsigned int cport, struct gb_driver *driver)
 {
 	struct gb_cport *cport_ptr;
 	int retval;
