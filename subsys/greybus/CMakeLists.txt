@@ -14,11 +14,9 @@ zephyr_library_sources(
   platform/manifest.c
   platform/service.c
   platform/certificate.c
-  platform/bundle.c
   platform/bus.c
   platform/control.c
-  platform/interface.c
-  platform/string.c)
+)
 
 if(CONFIG_GREYBUS_TLS_BUILTIN)
   set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)
