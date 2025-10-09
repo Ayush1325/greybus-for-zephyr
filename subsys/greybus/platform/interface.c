@@ -17,8 +17,6 @@ LOG_MODULE_REGISTER(greybus_platform_interface, CONFIG_GREYBUS_LOG_LEVEL);
 
 struct greybus_interface_config {
 	const uint8_t num;
-	const uint16_t vendor_string_id;
-	const uint16_t product_string_id;
 	const char *const bus_name;
 };
 
@@ -44,9 +42,6 @@ static int greybus_interface_init(const struct device *dev)
                                                                                                    \
 	static const struct greybus_interface_config greybus_interface_config_##_num = {           \
 		.num = (uint8_t)_num,                                                              \
-		.vendor_string_id = DT_PROP(DT_PHANDLE(DT_DRV_INST(_num), vendor_string_id), id),  \
-		.product_string_id =                                                               \
-			DT_PROP(DT_PHANDLE(DT_DRV_INST(_num), product_string_id), id),             \
 		.bus_name = DT_NODE_FULL_NAME(DT_PARENT(DT_DRV_INST(_num))),                       \
 	};                                                                                         \
                                                                                                    \

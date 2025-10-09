@@ -28,26 +28,9 @@
 	version-major = <GREYBUS_VERSION_MAJOR>;
 	version-minor = <GREYBUS_VERSION_MINOR>;
 
-	gbstring1: gbstring1 {
-		status = "okay";
-		compatible = "zephyr,greybus-string";
-		/* NB: string id 0 is invalid */
-		id = <1>;
-		greybus-string = "Zephyr Project RTOS";
-	};
-
-	gbstring2: gbstring2 {
-		status = "okay";
-		compatible = "zephyr,greybus-string";
-		id = <2>;
-		greybus-string = "Greybus Service Sample Application";
-	};
-
 	gbinterface0 {
 		status = "okay";
 		compatible = "zephyr,greybus-interface";
-		vendor-string-id = <&gbstring1>;
-		product-string-id = <&gbstring2>;
 		greybus-interface;
 	};
 

@@ -14,11 +14,3 @@ properties:
       type: boolean
       required: true
       description: DeviceTree representation of a Greybus manifest string descriptor
-    "vendor-string-id":
-      type: phandle
-      required: true
-      description: "Reference to greybus-string describing the vendor"
-    "product-string-id":
-      type: phandle
-      required: true
-      description: "Reference to greybus-string describing the product"

@@ -18,7 +18,7 @@ zephyr_library_sources(
   platform/bus.c
   platform/control.c
   platform/interface.c
-  platform/string.c)
+)
 
 if(CONFIG_GREYBUS_TLS_BUILTIN)
   set(gen_dir ${ZEPHYR_BINARY_DIR}/include/generated/)
