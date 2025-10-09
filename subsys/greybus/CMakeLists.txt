@@ -39,6 +39,8 @@ zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP
                              platform/transport-tcpip.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART
                              platform/transport-uart.c)
+zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_DUMMY
+                             platform/transport-dummy.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_CONTROL control-gpb.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_AUDIO audio.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_CAMERA camera.c)

@@ -159,3 +159,49 @@ int manifest_create(uint8_t buf[], size_t len)
 
 	return manifest_size();
 }
+
+void manifest_print(uint8_t buf[])
+{
+	size_t i;
+	size_t current_offset = 0;
+	struct greybus_descriptor *desc;
+	struct greybus_manifest *mnfb = (struct greybus_manifest *)buf;
+
+	printk("[manifest-header]\n");
+	printk("version-major = %u\n", mnfb->header.version_major);
+	printk("version-minor = %u\n", mnfb->header.version_minor);
+
+	current_offset += sizeof(struct greybus_manifest_header);
+
+	for (i = 0; current_offset < mnfb->header.size; i++) {
+		desc = (struct greybus_descriptor *)(buf + current_offset);
+
+		printk("\n");
+
+		switch (desc->header.type) {
+		case GREYBUS_TYPE_INTERFACE:
+			printk("[interface-descriptor]\n");
+			printk("vendor-string-id = 0x%01x\n", desc->interface.vendor_stringid);
+			printk("product-string-id = 0x%01x\n", desc->interface.product_stringid);
+			break;
+		case GREYBUS_TYPE_STRING:
+			printk("[string-descriptor 0x%01x]\n", desc->string.id);
+			printk("string = %.*s\n", desc->string.length, desc->string.string);
+			break;
+		case GREYBUS_TYPE_BUNDLE:
+			printk("[bundle-descriptor 0x%01x]\n", desc->bundle.id);
+			printk("class = 0x%01x\n", desc->bundle.class);
+			break;
+		case GREYBUS_TYPE_CPORT:
+			printk("[cport-descriptor 0x%01x]\n", desc->cport.id);
+			printk("bundle = 0x%01x\n", desc->cport.bundle);
+			printk("protocol = 0x%01x\n", desc->cport.protocol_id);
+			break;
+		default:
+			printk("Invalid Greybus Descriptor\n");
+			return;
+		}
+
+		current_offset += desc->header.size;
+	}
+}

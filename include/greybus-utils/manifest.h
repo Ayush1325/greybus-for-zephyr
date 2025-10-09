@@ -45,4 +45,22 @@
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
 void enable_cports(void);
 
+/**
+ * Write greybus manifest to the buffer. The buffer length should be >= GREYBUS_MANIFEST_SIZE
+ *
+ * @return size written if successful.
+ * @return -errno in case of error.
+ */
+int manifest_create(uint8_t buf[], size_t len);
+
+/**
+ * Get greybus manifest size.
+ */
+size_t manifest_size(void);
+
+/**
+ * Print greybus manifest to stdout. Intended for debugging.
+ */
+void manifest_print(uint8_t buf[]);
+
 #endif

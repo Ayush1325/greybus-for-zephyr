@@ -37,7 +37,6 @@
 #include <greybus-utils/manifest.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
-#include "platform/manifest.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(greybus_control, CONFIG_GREYBUS_LOG_LEVEL);

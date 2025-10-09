@@ -163,6 +163,12 @@ config GREYBUS_XPORT_UART_DEV
 	help
 	  This setting specifies which UART the Greybus service will use.
 endif # GREYBUS_XPORT_UART
+
+config GREYBUS_XPORT_DUMMY
+	bool "Use the dummy Transport for Greybus"
+	help
+	  This is intended for testing and tracking base greybus subsystem size.
+
 endchoice
 
 config GREYBUS_AUDIO
