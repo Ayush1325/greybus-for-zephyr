@@ -10,7 +10,7 @@ static void init()
 {
 }
 
-static int listen(unsigned int cport)
+static int listen(uint16_t cport)
 {
 	return 0;
 }
@@ -20,7 +20,7 @@ static struct gb_transport_backend gb_trans_backend = {
 	.listen = listen,
 };
 
-struct gb_transport_backend *gb_transport_backend_init(size_t num_cports)
+struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports)
 {
 	return &gb_trans_backend;
 }

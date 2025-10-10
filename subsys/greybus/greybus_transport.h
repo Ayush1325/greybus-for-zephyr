@@ -75,7 +75,7 @@ static inline void gb_transport_message_empty_response_send(struct gb_message *r
 /**
  * Intialize a greybus transport backend
  */
-struct gb_transport_backend *gb_transport_backend_init(size_t num_cports);
+struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports);
 
 /**
  * Get the current greybus transport backend

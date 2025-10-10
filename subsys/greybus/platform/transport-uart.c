@@ -241,7 +241,7 @@ out:
 	return r;
 }
 
-struct gb_transport_backend *gb_transport_backend_init(size_t num_cports)
+struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports)
 {
 
 	int r;

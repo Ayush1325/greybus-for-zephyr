@@ -67,8 +67,8 @@ struct gb_msg_with_cport {
 struct gb_transport_backend {
 	void (*init)(void);
 	void (*exit)(void);
-	int (*listen)(unsigned int cport);
-	int (*stop_listening)(unsigned int cport);
+	int (*listen)(uint16_t cport);
+	int (*stop_listening)(uint16_t cport);
 	int (*send)(uint16_t cport, const struct gb_message *msg);
 };
 
