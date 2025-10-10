@@ -48,6 +48,9 @@ enum {
 #define GB_MAX_PAYLOAD_SIZE     (GB_MTU - sizeof(struct gb_operation_hdr))
 #define GB_TIMESYNC_MAX_STROBES 0x04
 
+#define CONTROL_BUNDLE_ID 0x00
+#define CONTROL_CPORT_ID  0x00
+
 #define GB_INVALID_TYPE 0x7f
 
 enum gb_event {
@@ -142,8 +145,7 @@ static inline int gb_register_named_driver(unsigned int cport, struct gb_driver 
 	return _gb_register_driver(cport, driver);
 }
 
-#define gb_register_driver(cport, driver)                                                  \
-	gb_register_named_driver(cport, driver, __FILE__)
+#define gb_register_driver(cport, driver) gb_register_named_driver(cport, driver, __FILE__)
 int gb_listen(unsigned int cport);
 int gb_stop_listening(unsigned int cport);
 int gb_notify(unsigned cport, enum gb_event event);

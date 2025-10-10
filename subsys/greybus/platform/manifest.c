@@ -40,13 +40,14 @@ struct greybus_manifest_cport {
 #define _GREYBUS_MANIFEST_BUNDLES_SIZE(n) (GREYBUS_MANIFEST_BUNDLE_SIZE * n)
 #define _GREYBUS_MANIFEST_CPORTS_SIZE(n)  (GREYBUS_MANIFEST_CPORT_SIZE * n)
 
-#define GREYBUS_BUNDLE_HANDLER(node_id)                                                            \
-	IF_ENABLED(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle),                             \
-		   (DT_PROP(node_id, bundle_class), ))
+#define _GB_BUNDLE_CB(node_id)                                                                     \
+	COND_CODE_1(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle_bridged_phy),                \
+		    (GREYBUS_CLASS_BRIDGED_PHY), (EMPTY))
 
+/* Position = Bundle ID. Value = Class */
 static uint8_t bundles[] = {
-	/* cport0 is always control cport */
-	0, DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_BUNDLE_HANDLER)};
+	GREYBUS_CLASS_CONTROL,
+	DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GB_BUNDLE_CB, (, ))};
 
 #define GREYBUS_MANIFEST_SIZE                                                                      \
 	(sizeof(struct greybus_manifest_header) + GREYBUS_MANIFEST_INTERFACE_SIZE +                \

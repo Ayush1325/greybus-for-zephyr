@@ -1,54 +1,17 @@
 /*
  * Copyright (c) 2020 Friedt Professional Engineering Services, Inc
+ * Copyright (c) 2025 Ayush Singh BeagleBoard.org
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
- #include <dt-bindings/greybus/greybus.h>
- #include <dt-bindings/greybus/spi.h>
 
 / {
-	resources {
-		compatible = "test,greybus-i2c";
-		test-i2c = <&i2c0>; 
-	};
-
-	greybus0: greybus0 {
-		compatible = "zephyr,greybus";
-		greybus;
-	};
-};
-
-&flash0 {
-	status = "okay";
-};
-
-&greybus0 {
-	status = "okay";
-
-	gbbundle1 {
-		status = "okay";
-		compatible = "zephyr,greybus-bundle";
-		greybus-bundle;
-		id = <1>;
-		bundle-class = <BUNDLE_CLASS_BRIDGED_PHY>;		
-				
-		gbgpio0 {
+	zephyr,greybus {
+		gbbundle1 {
 			status = "okay";
-			compatible = "zephyr,greybus-gpio-controller";
-			greybus-gpio-controller = <&gpio0>;
-			/* GPIO is CPort 1 in this case */
-			id = <1>;
-			cport-protocol = <CPORT_PROTOCOL_GPIO>;
+			compatible = "zephyr,greybus-bundle-bridged-phy";
+			gpio-controllers = <&gpio0>;
+			i2c-controllers = <&sens_i2c>;
 		};
-
-		gbi2c0 {
-			status = "okay";
-			compatible = "zephyr,greybus-i2c-controller";
-			greybus-i2c-controller = <&sens_i2c>;
-			/* I2C is CPort 2 in this case */
-			id = <2>;
-			cport-protocol = <CPORT_PROTOCOL_I2C>;
-		};
-
 	};
 };

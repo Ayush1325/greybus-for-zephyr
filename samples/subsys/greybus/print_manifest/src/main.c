@@ -13,6 +13,7 @@ int main(void)
 {
 	int ret = manifest_create(manifest, ARRAY_SIZE(manifest));
 
+	printk("Cports: %d\n", GREYBUS_CPORT_COUNT);
 	printk("Manifest Size: %d\n", ret);
 	manifest_print(manifest);
 

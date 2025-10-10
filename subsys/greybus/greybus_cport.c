@@ -11,30 +11,42 @@
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
-#define GREYBUS_MANFIEST_CPORT(_bundle, _protocol)                                                 \
+/* Reset the counter to 0 */
+enum {
+	COUNTER_BASE = __COUNTER__
+};
+#define LOCAL_COUNTER (__COUNTER__ - COUNTER_BASE - 1)
+
+#define GB_CPORT(_dev, _bundle, _protocol)                                                         \
 	{                                                                                          \
 		.bundle = _bundle,                                                                 \
 		.protocol = _protocol,                                                             \
-	},
+		.dev = _dev,                                                                       \
+	}
 
-#define GREYBUS_CREATE_CPORT_FROM_PROP(_node_id, _bundle)                                          \
-	GREYBUS_MANFIEST_CPORT(_bundle, DT_PROP(_node_id, cport_protocol))
+#define _GB_CPORT(_node_id, _prop, _idx, _bundle, _protocol)                                       \
+	GB_CPORT(DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)), _bundle, _protocol)
 
-#define GREYBUS_CPORT_IN_BUNDLE_HANDLER(_node_id)                                                  \
-	DT_FOREACH_CHILD_STATUS_OKAY_VARGS(_node_id, GREYBUS_CREATE_CPORT_FROM_PROP,               \
-					   DT_PROP(_node_id, id))
+#define GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(_node_id, _bundle)                                    \
+	FOR_EACH_NONEMPTY_TERM(                                                                    \
+		IDENTITY, (, ),                                                                    \
+		IF_ENABLED(CONFIG_GREYBUS_GPIO, (DT_FOREACH_PROP_ELEM_SEP_VARGS(                   \
+							_node_id, gpio_controllers, _GB_CPORT,     \
+							(, ), _bundle, GREYBUS_PROTOCOL_GPIO))),   \
+		IF_ENABLED(CONFIG_GREYBUS_I2C,                                                     \
+			   (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, i2c_controllers, _GB_CPORT,   \
+							   (, ), _bundle, GREYBUS_PROTOCOL_I2C))))
 
-#define GREYBUS_CPORT_HANDLER(_node_id)                                                            \
-	IF_ENABLED(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle),                            \
-		   (GREYBUS_CPORT_IN_BUNDLE_HANDLER(_node_id)))
+#define GB_CPORTS_IN_BUNDLE(node_id)                                                               \
+	COND_CODE_1(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle_bridged_phy),                \
+		    (GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id, LOCAL_COUNTER)), (EMPTY))
 
-static struct gb_cport cports[GREYBUS_CPORT_COUNT] = {
+static struct gb_cport cports[] = {
 	/* cport0 is always control cport */
-	{
-		.bundle = 0,
-		.protocol = 0,
-	},
-	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_CPORT_HANDLER)};
+	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_CONTROL),
+	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_CPORTS_IN_BUNDLE)};
+
+BUILD_ASSERT(GREYBUS_CPORT_COUNT == ARRAY_SIZE(cports));
 
 struct gb_cport *gb_cport_get(uint16_t cport)
 {
@@ -66,12 +78,10 @@ void enable_cports(void)
 	for (cport_id = 0; cport_id < GREYBUS_CPORT_COUNT; ++cport_id) {
 		protocol = cports[cport_id].protocol;
 
-#ifdef CONFIG_GREYBUS_CONTROL
 		if (protocol == GREYBUS_PROTOCOL_CONTROL) {
 			LOG_INF("Registering CONTROL greybus driver.");
 			gb_control_register(cport_id);
 		}
-#endif
 
 #ifdef CONFIG_GREYBUS_GPIO
 		if (protocol == GREYBUS_PROTOCOL_GPIO) {
@@ -125,7 +135,7 @@ void enable_cports(void)
 #ifdef CONFIG_GREYBUS_SPI
 		if (protocol == GREYBUS_PROTOCOL_SPI) {
 			LOG_INF("Registering SPI greybus driver.");
-			gb_spi_register(cport_id);
+			// gb_spi_register(cport_id);
 		}
 #endif
 
