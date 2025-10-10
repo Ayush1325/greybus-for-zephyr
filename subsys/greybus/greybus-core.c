@@ -119,13 +119,13 @@ uint8_t gb_errno_to_op_result(int err)
 
 static void gb_process_msg(struct gb_message *msg, uint16_t cport)
 {
-	struct gb_driver *drv = gb_cport_get(cport)->driver;
+	struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	if (gb_message_type(msg) == GB_PING_TYPE) {
 		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 	}
 
-	drv->op_handler(drv, msg, cport);
+	cport_ptr->driver->op_handler(cport_ptr->priv, msg, cport);
 }
 
 static void gb_pending_message_worker(void *p1, void *p2, void *p3)

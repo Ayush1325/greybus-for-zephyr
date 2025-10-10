@@ -75,8 +75,7 @@ struct gb_transport_backend {
 
 struct gb_driver;
 
-typedef void (*gb_operation_handler_t)(struct gb_driver *drv, struct gb_message *msg,
-				       uint16_t cport);
+typedef void (*gb_operation_handler_t)(const void *priv, struct gb_message *msg, uint16_t cport);
 
 struct gb_driver {
 	/*

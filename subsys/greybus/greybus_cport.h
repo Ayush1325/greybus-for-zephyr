@@ -11,7 +11,7 @@
 
 struct gb_cport {
 	struct gb_driver *driver;
-	const struct device *dev;
+	const void *priv;
 	uint8_t bundle;
 	uint8_t protocol;
 };

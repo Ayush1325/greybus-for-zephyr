@@ -415,9 +415,9 @@ out:
 	gb_transport_message_empty_response_send(req, errcode, cport);
 }
 
-static void gb_spi_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
+static void gb_spi_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	const struct device *dev = gb_cport_to_device(cport);
+	const struct device *dev = priv;
 
 	switch (gb_message_type(msg)) {
 	case GB_SPI_PROTOCOL_VERSION:

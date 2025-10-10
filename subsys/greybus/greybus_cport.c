@@ -8,6 +8,7 @@
 #include "greybus-utils/manifest.h"
 #include "greybus-manifest.h"
 #include <zephyr/logging/log.h>
+#include "greybus_gpio.h"
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
@@ -17,25 +18,47 @@ enum {
 };
 #define LOCAL_COUNTER (__COUNTER__ - COUNTER_BASE - 1)
 
-#define GB_CPORT(_dev, _bundle, _protocol)                                                         \
+#define GB_GPIO_PRIV_DATA(_node_id, _prop, _idx)                                                   \
+	static struct gb_gpio_driver_data gb_gpio_priv_data_##_idx = {                             \
+		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
+	};
+
+#define GB_GPIO_PRIV_DATA_HANDLER(_node_id)                                                        \
+	DT_FOREACH_PROP_ELEM(_node_id, gpio_controllers, GB_GPIO_PRIV_DATA)
+
+#define GB_PRIV_DATA_HANDLER(_node_id)                                                             \
+	IF_ENABLED(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle_bridged_phy),                \
+		   (GB_GPIO_PRIV_DATA_HANDLER(_node_id)))
+
+/* Define GPIO private data */
+DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
+
+#define GB_CPORT_DEV_PRIV_DATA(_node_id, _prop, _idx)                                              \
+	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx))
+
+#define GB_CPORT_GPIO_PRIV_DATA(_node_id, _prop, _idx) &gb_gpio_priv_data_##_idx
+
+#define GB_CPORT(_priv, _bundle, _protocol)                                                        \
 	{                                                                                          \
 		.bundle = _bundle,                                                                 \
 		.protocol = _protocol,                                                             \
-		.dev = _dev,                                                                       \
+		.priv = _priv,                                                                     \
 	}
 
-#define _GB_CPORT(_node_id, _prop, _idx, _bundle, _protocol)                                       \
-	GB_CPORT(DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)), _bundle, _protocol)
+#define _GB_CPORT(_node_id, _prop, _idx, _bundle, _protocol, PRIV_FN)                              \
+	GB_CPORT(PRIV_FN(_node_id, _prop, _idx), _bundle, _protocol)
 
 #define GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(_node_id, _bundle)                                    \
 	FOR_EACH_NONEMPTY_TERM(                                                                    \
 		IDENTITY, (, ),                                                                    \
-		IF_ENABLED(CONFIG_GREYBUS_GPIO, (DT_FOREACH_PROP_ELEM_SEP_VARGS(                   \
-							_node_id, gpio_controllers, _GB_CPORT,     \
-							(, ), _bundle, GREYBUS_PROTOCOL_GPIO))),   \
+		IF_ENABLED(CONFIG_GREYBUS_GPIO,                                                    \
+			   (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, gpio_controllers, _GB_CPORT,  \
+							   (, ), _bundle, GREYBUS_PROTOCOL_GPIO,   \
+							   GB_CPORT_GPIO_PRIV_DATA))),             \
 		IF_ENABLED(CONFIG_GREYBUS_I2C,                                                     \
 			   (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, i2c_controllers, _GB_CPORT,   \
-							   (, ), _bundle, GREYBUS_PROTOCOL_I2C))))
+							   (, ), _bundle, GREYBUS_PROTOCOL_I2C,    \
+							   GB_CPORT_DEV_PRIV_DATA))))
 
 #define GB_CPORTS_IN_BUNDLE(node_id)                                                               \
 	COND_CODE_1(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle_bridged_phy),                \
@@ -186,39 +209,4 @@ void enable_cports(void)
 		}
 #endif
 	}
-}
-
-const struct device *gb_cport_to_device(unsigned int cport)
-{
-	if (cport >= GREYBUS_CPORT_COUNT) {
-		return NULL;
-	}
-
-	return cports[cport].dev;
-}
-
-int gb_device_to_cport(const struct device *dev)
-{
-	if (!dev) {
-		return -EINVAL;
-	}
-
-	for (int i = 0; i < 0; ++i) {
-		if (cports[i].dev == dev) {
-			return i;
-		}
-	}
-
-	return -ENOENT;
-}
-
-int gb_add_cport_device_mapping(unsigned int cport, const struct device *dev)
-{
-	if (cport >= GREYBUS_CPORT_COUNT) {
-		return -EINVAL;
-	}
-
-	cports[cport].dev = dev;
-
-	return 0;
 }

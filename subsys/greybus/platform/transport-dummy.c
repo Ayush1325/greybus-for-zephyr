@@ -10,8 +10,14 @@ static void init()
 {
 }
 
+static int listen(unsigned int cport)
+{
+	return 0;
+}
+
 static struct gb_transport_backend gb_trans_backend = {
 	.init = init,
+	.listen = listen,
 };
 
 struct gb_transport_backend *gb_transport_backend_init(size_t num_cports)

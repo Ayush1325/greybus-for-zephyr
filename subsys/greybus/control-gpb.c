@@ -228,8 +228,10 @@ static void gb_control_timesync_get_last_event(uint16_t cport, struct gb_message
 	gb_transport_message_empty_response_send(req, gb_errno_to_op_result(retval), cport);
 }
 
-static void gb_control_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
+static void gb_control_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
+	ARG_UNUSED(priv);
+
 	switch (gb_message_type(msg)) {
 	case GB_CONTROL_TYPE_PROTOCOL_VERSION:
 		return gb_control_protocol_version(cport, msg);
