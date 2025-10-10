@@ -31,7 +31,6 @@
 #include <greybus/ara_version.h>
 #include <zephyr/sys/byteorder.h>
 #include <greybus/greybus.h>
-#include <unipro/unipro.h>
 #include <zephyr/device.h>
 #include <greybus/timesync.h>
 #include <greybus-utils/manifest.h>
@@ -97,7 +96,6 @@ static void gb_control_connected(uint16_t cport, struct gb_message *req)
 		goto error_notify;
 	}
 
-	unipro_enable_fct_tx_flow(cport);
 	return gb_transport_message_empty_response_send(req, GB_OP_SUCCESS, cport);
 
 error_notify:
@@ -116,8 +114,6 @@ static void gb_control_disconnected(uint16_t cport, struct gb_message *req)
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	unipro_disable_fct_tx_flow(cport);
-
 	retval = gb_notify(cport, GB_EVT_DISCONNECTED);
 	if (retval) {
 		LOG_ERR("Cannot notify GB driver of disconnect event.");
@@ -126,8 +122,6 @@ static void gb_control_disconnected(uint16_t cport, struct gb_message *req)
 		 * on the CPort.
 		 */
 	}
-
-	unipro_reset_cport(cport, NULL, NULL);
 
 	retval = gb_stop_listening(cport);
 	if (retval) {

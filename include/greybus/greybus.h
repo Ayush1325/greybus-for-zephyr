@@ -35,7 +35,6 @@
 #include <stdbool.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/dlist.h>
-#include <unipro/unipro.h>
 #include <greybus/types.h>
 
 #ifndef OK
@@ -127,7 +126,6 @@ enum gb_operation_result {
 
 int gb_init(struct gb_transport_backend *transport);
 void gb_deinit(void);
-int gb_unipro_init(void);
 
 int gb_listen(unsigned int cport);
 int gb_stop_listening(unsigned int cport);

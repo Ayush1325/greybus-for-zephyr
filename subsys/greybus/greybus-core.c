@@ -30,7 +30,6 @@
 #include <zephyr/kernel.h>
 
 #include "greybus_cport.h"
-#include <unipro/unipro.h>
 #include <greybus/greybus.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
