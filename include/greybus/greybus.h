@@ -127,8 +127,8 @@ enum gb_operation_result {
 int gb_init(struct gb_transport_backend *transport);
 void gb_deinit(void);
 
-int gb_listen(unsigned int cport);
-int gb_stop_listening(unsigned int cport);
+int gb_listen(uint16_t cport);
+int gb_stop_listening(uint16_t cport);
 int gb_notify(uint16_t cport, enum gb_event event);
 
 int greybus_rx_handler(uint16_t cport, struct gb_message *msg);

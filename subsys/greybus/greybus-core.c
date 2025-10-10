@@ -155,7 +155,7 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 	return 0;
 }
 
-int gb_listen(unsigned int cport)
+int gb_listen(uint16_t cport)
 {
 	const struct gb_transport_backend *transport = gb_transport_get_backend();
 	struct gb_cport *cport_ptr = gb_cport_get(cport);
@@ -173,7 +173,7 @@ int gb_listen(unsigned int cport)
 	return transport->listen(cport);
 }
 
-int gb_stop_listening(unsigned int cport)
+int gb_stop_listening(uint16_t cport)
 {
 	const struct gb_transport_backend *transport = gb_transport_get_backend();
 	struct gb_cport *cport_ptr = gb_cport_get(cport);
