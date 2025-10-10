@@ -35,7 +35,6 @@
 #include <stdbool.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/dlist.h>
-#include <unipro/unipro.h>
 #include <greybus/types.h>
 
 #ifndef OK
@@ -68,8 +67,8 @@ struct gb_msg_with_cport {
 struct gb_transport_backend {
 	void (*init)(void);
 	void (*exit)(void);
-	int (*listen)(unsigned int cport);
-	int (*stop_listening)(unsigned int cport);
+	int (*listen)(uint16_t cport);
+	int (*stop_listening)(uint16_t cport);
 	int (*send)(uint16_t cport, const struct gb_message *msg);
 };
 
@@ -85,17 +84,16 @@ struct gb_driver {
 	 * in bundle->priv. The same bundle object will be passed to the driver in
 	 * all subsequent greybus handler callbacks calls.
 	 */
-	int (*init)(unsigned int cport);
+	int (*init)(const void *priv);
 	/*
 	 * This function is called upon driver deregistration. All private data
 	 * stored in bundle should be freed and struct device should be closed.
 	 */
-	void (*exit)(unsigned int cport);
-	void (*connected)(unsigned int cport);
-	void (*disconnected)(unsigned int cport);
+	void (*exit)(const void *priv);
+	void (*connected)(const void *priv);
+	void (*disconnected)(const void *priv);
 
 	gb_operation_handler_t op_handler;
-	const char *name;
 };
 
 struct gb_operation_hdr {
@@ -126,18 +124,12 @@ enum gb_operation_result {
 	GB_OP_INTERNAL = 0xff,
 };
 
-static inline const char *gb_driver_name(struct gb_driver *driver)
-{
-	return driver->name;
-}
-
 int gb_init(struct gb_transport_backend *transport);
 void gb_deinit(void);
-int gb_unipro_init(void);
 
-int gb_listen(unsigned int cport);
-int gb_stop_listening(unsigned int cport);
-int gb_notify(unsigned cport, enum gb_event event);
+int gb_listen(uint16_t cport);
+int gb_stop_listening(uint16_t cport);
+int gb_notify(uint16_t cport, enum gb_event event);
 
 int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
 

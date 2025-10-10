@@ -30,7 +30,6 @@
 #include <zephyr/kernel.h>
 
 #include "greybus_cport.h"
-#include <unipro/unipro.h>
 #include <greybus/greybus.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
@@ -43,22 +42,7 @@
 
 LOG_MODULE_REGISTER(greybus, CONFIG_GREYBUS_LOG_LEVEL);
 
-#define TIMEOUT_IN_MS 1000
-#define GB_PING_TYPE  0x00
-
-#define ONE_SEC_IN_MSEC  1000
-#define ONE_MSEC_IN_NSEC 1000000
-
-#ifndef CLOCKS_PER_SEC
-#define CLOCKS_PER_SEC 100
-#endif
-
-#define TIMEOUT_WD_DELAY (TIMEOUT_IN_MS * CLOCKS_PER_SEC) / ONE_SEC_IN_MSEC
-
-#define DEBUGASSERT(x)
-#define atomic_init(ptr, val) *(ptr) = val
-
-static struct gb_transport_backend *transport_backend;
+#define GB_PING_TYPE 0x00
 
 K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), 10, 1);
 
@@ -171,31 +155,10 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 	return 0;
 }
 
-int gb_unregister_driver(unsigned int cport)
+int gb_listen(uint16_t cport)
 {
+	const struct gb_transport_backend *transport = gb_transport_get_backend();
 	struct gb_cport *cport_ptr = gb_cport_get(cport);
-	if (!cport_ptr || !cport_ptr->driver) {
-		return -EINVAL;
-	}
-
-	if (transport_backend->stop_listening) {
-		transport_backend->stop_listening(cport);
-	}
-
-	if (cport_ptr->driver->exit) {
-		cport_ptr->driver->exit(cport);
-	}
-	cport_ptr->driver = NULL;
-
-	return 0;
-}
-
-int gb_listen(unsigned int cport)
-{
-	struct gb_cport *cport_ptr = gb_cport_get(cport);
-
-	DEBUGASSERT(transport_backend);
-	DEBUGASSERT(transport_backend->listen);
 
 	if (!cport_ptr) {
 		LOG_ERR("Invalid cport number %u", cport);
@@ -207,15 +170,13 @@ int gb_listen(unsigned int cport)
 		return -EINVAL;
 	}
 
-	return transport_backend->listen(cport);
+	return transport->listen(cport);
 }
 
-int gb_stop_listening(unsigned int cport)
+int gb_stop_listening(uint16_t cport)
 {
+	const struct gb_transport_backend *transport = gb_transport_get_backend();
 	struct gb_cport *cport_ptr = gb_cport_get(cport);
-
-	DEBUGASSERT(transport_backend);
-	DEBUGASSERT(transport_backend->stop_listening);
 
 	if (!cport_ptr) {
 		LOG_ERR("Invalid cport number %u", cport);
@@ -227,7 +188,7 @@ int gb_stop_listening(unsigned int cport)
 		return -EINVAL;
 	}
 
-	return transport_backend->stop_listening(cport);
+	return transport->stop_listening(cport);
 }
 
 int gb_init(struct gb_transport_backend *transport)
@@ -240,33 +201,27 @@ int gb_init(struct gb_transport_backend *transport)
 		&gb_rx_thread, gb_rx_thread_stack, K_THREAD_STACK_SIZEOF(gb_rx_thread_stack),
 		gb_pending_message_worker, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
 
-	transport_backend = transport;
-	transport_backend->init();
+	transport->init();
 
 	return 0;
 }
 
 void gb_deinit(void)
 {
-	int i;
+	const struct gb_transport_backend *transport = gb_transport_get_backend();
 
-	if (!transport_backend) {
+	if (!transport) {
 		return; /* gb not initialized */
-	}
-
-	for (i = 0; i < GREYBUS_CPORT_COUNT; i++) {
-		gb_unregister_driver(i);
 	}
 
 	k_thread_abort(gb_rx_threadid);
 
-	if (transport_backend->exit) {
-		transport_backend->exit();
+	if (transport->exit) {
+		transport->exit();
 	}
-	transport_backend = NULL;
 }
 
-int gb_notify(unsigned cport, enum gb_event event)
+int gb_notify(uint16_t cport, enum gb_event event)
 {
 	struct gb_cport *cport_ptr = gb_cport_get(cport);
 
@@ -281,13 +236,13 @@ int gb_notify(unsigned cport, enum gb_event event)
 	switch (event) {
 	case GB_EVT_CONNECTED:
 		if (cport_ptr->driver->connected) {
-			cport_ptr->driver->connected(cport);
+			cport_ptr->driver->connected(cport_ptr->priv);
 		}
 		break;
 
 	case GB_EVT_DISCONNECTED:
 		if (cport_ptr->driver->disconnected) {
-			cport_ptr->driver->disconnected(cport);
+			cport_ptr->driver->disconnected(cport_ptr->priv);
 		}
 		break;
 
@@ -296,9 +251,4 @@ int gb_notify(unsigned cport, enum gb_event event)
 	}
 
 	return 0;
-}
-
-struct gb_transport_backend *gb_transport_get(void)
-{
-	return transport_backend;
 }

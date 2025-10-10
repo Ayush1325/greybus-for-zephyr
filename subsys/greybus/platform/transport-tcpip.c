@@ -138,12 +138,12 @@ static void gb_trans_exit(void)
 {
 }
 
-static int gb_trans_listen_start(unsigned int cport)
+static int gb_trans_listen_start(uint16_t cport)
 {
 	return 0;
 }
 
-static int gb_trans_listen_stop(unsigned int cport)
+static int gb_trans_listen_stop(uint16_t cport)
 {
 	return 0;
 }
@@ -362,7 +362,7 @@ static void gb_trans_rx_thread_handler(void *p1, void *p2, void *p3)
 	}
 }
 
-struct gb_transport_backend *gb_transport_backend_init(size_t num_cports)
+struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports)
 {
 	if (num_cports >= CPORT_ID_MAX) {
 		LOG_ERR("invalid number of cports %u", (unsigned)num_cports);

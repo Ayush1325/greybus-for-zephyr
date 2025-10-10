@@ -73,14 +73,9 @@ static inline void gb_transport_message_empty_response_send(struct gb_message *r
 }
 
 /**
- * TODO: Remove as soon as possible
- */
-struct gb_transport_backend *gb_transport_get(void);
-
-/**
  * Intialize a greybus transport backend
  */
-struct gb_transport_backend *gb_transport_backend_init(size_t num_cports);
+struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports);
 
 /**
  * Get the current greybus transport backend
