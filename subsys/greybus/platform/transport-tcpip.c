@@ -5,7 +5,6 @@
 #include <zephyr/net/socket.h>
 
 #include "certificate.h"
-#include "transport.h"
 #include "../greybus_messages.h"
 
 LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
