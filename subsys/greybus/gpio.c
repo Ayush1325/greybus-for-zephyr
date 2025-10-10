@@ -37,13 +37,6 @@
 #include "greybus_transport.h"
 #include "greybus_gpio.h"
 
-#if defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) || defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) ||        \
-	defined(CONFIG_BOARD_NRF52_BSIM)
-#include <semaphore.h>
-#else
-#include <zephyr/posix/semaphore.h>
-#endif
-
 #include "gpio-gb.h"
 
 LOG_MODULE_REGISTER(greybus_gpio, CONFIG_GREYBUS_LOG_LEVEL);
@@ -279,14 +272,9 @@ static void gb_gpio_irq_unmask(uint16_t cport, struct gb_message *req, const str
 static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
 	int ret;
-	const struct gpio_driver_config *cfg;
+	gpio_flags_t flags;
 	const struct gb_gpio_irq_type_request *request =
 		(const struct gb_gpio_irq_type_request *)req->payload;
-	enum gpio_int_mode mode;
-	enum gpio_int_trig trigger;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -295,35 +283,28 @@ static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struc
 
 	switch (request->type) {
 	case GB_GPIO_IRQ_TYPE_NONE:
-		mode = GPIO_INT_MODE_DISABLED;
-		trigger = 0;
+		flags = GPIO_INT_DISABLE;
 		break;
 	case GB_GPIO_IRQ_TYPE_EDGE_RISING:
-		mode = GPIO_INT_MODE_EDGE;
-		trigger = GPIO_INT_TRIG_HIGH;
+		flags = GPIO_INT_EDGE_RISING;
 		break;
 	case GB_GPIO_IRQ_TYPE_EDGE_FALLING:
-		mode = GPIO_INT_MODE_EDGE;
-		trigger = GPIO_INT_TRIG_LOW;
+		flags = GPIO_INT_EDGE_FALLING;
 		break;
 	case GB_GPIO_IRQ_TYPE_EDGE_BOTH:
-		mode = GPIO_INT_MODE_EDGE;
-		trigger = GPIO_INT_TRIG_BOTH;
+		flags = GPIO_INT_EDGE_BOTH;
 		break;
 	case GB_GPIO_IRQ_TYPE_LEVEL_HIGH:
-		mode = GPIO_INT_MODE_LEVEL;
-		trigger = GPIO_INT_TRIG_HIGH;
+		flags = GPIO_INT_LEVEL_HIGH;
 		break;
 	case GB_GPIO_IRQ_TYPE_LEVEL_LOW:
-		mode = GPIO_INT_MODE_LEVEL;
-		trigger = GPIO_INT_TRIG_HIGH;
+		flags = GPIO_INT_LEVEL_LOW;
 		break;
 	default:
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	ret = gb_errno_to_op_result(
-		gpio_pin_interrupt_configure(dev, request->which, mode | trigger));
+	ret = gb_errno_to_op_result(gpio_pin_interrupt_configure(dev, request->which, flags));
 
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
