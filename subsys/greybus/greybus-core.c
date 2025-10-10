@@ -190,48 +190,6 @@ int gb_unregister_driver(unsigned int cport)
 	return 0;
 }
 
-int _gb_register_driver(unsigned int cport, struct gb_driver *driver)
-{
-	struct gb_cport *cport_ptr;
-	int retval;
-
-	LOG_DBG("Registering Greybus driver on CP%u", cport);
-
-	if (!driver) {
-		LOG_ERR("No driver to register");
-		return -EINVAL;
-	}
-
-	cport_ptr = gb_cport_get(cport);
-	if (!cport_ptr) {
-		LOG_ERR("Invalid cport number %u", cport);
-		return -EINVAL;
-	}
-
-	if (cport_ptr->driver) {
-		LOG_ERR("%s is already registered for CP%u", gb_driver_name(cport_ptr->driver),
-			cport);
-		return -EEXIST;
-	}
-
-	if (!driver->op_handler) {
-		LOG_ERR("Invalid driver");
-		return -EINVAL;
-	}
-
-	if (driver->init) {
-		retval = driver->init(cport);
-		if (retval) {
-			LOG_ERR("Can not init %s", gb_driver_name(driver));
-			return retval;
-		}
-	}
-
-	cport_ptr->driver = driver;
-
-	return 0;
-}
-
 int gb_listen(unsigned int cport)
 {
 	struct gb_cport *cport_ptr = gb_cport_get(cport);

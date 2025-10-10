@@ -271,15 +271,6 @@ static void gb_control_handler(const void *priv, struct gb_message *msg, uint16_
 	}
 }
 
-static struct gb_driver control_driver = {
+struct gb_driver gb_control_driver = {
 	.op_handler = gb_control_handler,
 };
-
-void gb_control_register(int cport)
-{
-	gb_register_driver(cport, &control_driver);
-	unipro_attr_local_write(T_CPORTFLAGS,
-				CPORT_FLAGS_CSV_N | CPORT_FLAGS_CSD_N | CPORT_FLAGS_E2EFC, cport);
-	unipro_enable_fct_tx_flow(cport);
-	gb_listen(cport);
-}

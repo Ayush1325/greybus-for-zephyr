@@ -62,7 +62,6 @@ static int greybus_service_init(void)
 		goto clear_mnfb;
 	}
 
-	enable_cports();
 	LOG_INF("Greybus is active");
 	return 0;
 

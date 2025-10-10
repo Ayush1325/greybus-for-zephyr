@@ -434,17 +434,6 @@ static void gb_spi_handler(const void *priv, struct gb_message *msg, uint16_t cp
 	}
 }
 
-static struct gb_driver gb_spi_driver = {
+struct gb_driver gb_spi_driver = {
 	.op_handler = gb_spi_handler,
 };
-
-/**
- * @brief Register Greybus SPI protocol
- *
- * @param cport CPort number
- * @param bundle Bundle number.
- */
-void gb_spi_register(int cport)
-{
-	gb_register_driver(cport, &gb_spi_driver);
-}

@@ -50,7 +50,6 @@
 	(1 + DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
 
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
-void enable_cports(void);
 
 /**
  * Write greybus manifest to the buffer. The buffer length should be >= GREYBUS_MANIFEST_SIZE
