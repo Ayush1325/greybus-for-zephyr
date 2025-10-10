@@ -95,7 +95,6 @@ struct gb_driver {
 	void (*disconnected)(unsigned int cport);
 
 	gb_operation_handler_t op_handler;
-	const char *name;
 };
 
 struct gb_operation_hdr {
@@ -125,11 +124,6 @@ enum gb_operation_result {
 	GB_OP_UNKNOWN_ERROR = 0xfe,
 	GB_OP_INTERNAL = 0xff,
 };
-
-static inline const char *gb_driver_name(struct gb_driver *driver)
-{
-	return driver->name;
-}
 
 int gb_init(struct gb_transport_backend *transport);
 void gb_deinit(void);
