@@ -15,7 +15,7 @@ LOG_MODULE_REGISTER(greybus_transport_common, CONFIG_GREYBUS_LOG_LEVEL);
 int gb_transport_message_send(const struct gb_message *msg, uint16_t cport)
 {
 	int retval;
-	struct gb_transport_backend *transport_backend = gb_transport_get();
+	const struct gb_transport_backend *transport_backend = gb_transport_get_backend();
 
 	retval = transport_backend->send(cport, msg);
 	if (retval) {

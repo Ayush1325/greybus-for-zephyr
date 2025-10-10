@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "transport.h"
+#include "../greybus_transport.h"
 
 static void init()
 {
