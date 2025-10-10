@@ -12,7 +12,6 @@ jobs:
       uses: actions/checkout@v5
       with:
         path: greybus
-        submodules: true
 
     - name: Setup Zephyr project
       uses: zephyrproject-rtos/action-zephyr-setup@v1
@@ -22,14 +21,19 @@ jobs:
 
     - name: Build for beagleconnect_freedom
       run: |
-        export ZEPHYR_BASE=$(pwd)/zephyr
-        export CMAKE_PREFIX_PATH="$ZEPHYR_BASE/share/zephyr-package/cmake"
-        
+        mkdir dist
+
         west build -b beagleconnect_freedom -p always greybus/samples/subsys/greybus/net -- -DEXTRA_CONF_FILE=overlay-802154-subg.conf
+        mv build/zephyr/zephyr.bin dist/beagleconnect_freedom_net.bin
+        xz -z dist/beagleconnect_freedom_net.bin
+
+        west build -b beagleconnect_freedom -p always greybus/samples/subsys/greybus/print_manifest
+        mv build/zephyr/zephyr.bin dist/beagleconnect_freedom_print_manifest.bin
+        xz -z dist/beagleconnect_freedom_print_manifest.bin
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: greybus-beagleconnect-freedom-firmware
+        name: greybus-beagleconnect-freedom
         path: |
-          build/zephyr/zephyr.bin
+          dist/*
