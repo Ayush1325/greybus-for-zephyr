@@ -155,27 +155,6 @@ int greybus_rx_handler(uint16_t cport, struct gb_message *msg)
 	return 0;
 }
 
-int gb_unregister_driver(unsigned int cport)
-{
-	const struct gb_transport_backend *transport = gb_transport_get_backend();
-	struct gb_cport *cport_ptr = gb_cport_get(cport);
-
-	if (!cport_ptr || !cport_ptr->driver) {
-		return -EINVAL;
-	}
-
-	if (transport->stop_listening) {
-		transport->stop_listening(cport);
-	}
-
-	if (cport_ptr->driver->exit) {
-		cport_ptr->driver->exit(cport);
-	}
-	cport_ptr->driver = NULL;
-
-	return 0;
-}
-
 int gb_listen(unsigned int cport)
 {
 	const struct gb_transport_backend *transport = gb_transport_get_backend();
@@ -230,14 +209,9 @@ int gb_init(struct gb_transport_backend *transport)
 void gb_deinit(void)
 {
 	const struct gb_transport_backend *transport = gb_transport_get_backend();
-	int i;
 
 	if (!transport) {
 		return; /* gb not initialized */
-	}
-
-	for (i = 0; i < GREYBUS_CPORT_COUNT; i++) {
-		gb_unregister_driver(i);
 	}
 
 	k_thread_abort(gb_rx_threadid);
@@ -247,7 +221,7 @@ void gb_deinit(void)
 	}
 }
 
-int gb_notify(unsigned cport, enum gb_event event)
+int gb_notify(uint16_t cport, enum gb_event event)
 {
 	struct gb_cport *cport_ptr = gb_cport_get(cport);
 
@@ -262,13 +236,13 @@ int gb_notify(unsigned cport, enum gb_event event)
 	switch (event) {
 	case GB_EVT_CONNECTED:
 		if (cport_ptr->driver->connected) {
-			cport_ptr->driver->connected(cport);
+			cport_ptr->driver->connected(cport_ptr->priv);
 		}
 		break;
 
 	case GB_EVT_DISCONNECTED:
 		if (cport_ptr->driver->disconnected) {
-			cport_ptr->driver->disconnected(cport);
+			cport_ptr->driver->disconnected(cport_ptr->priv);
 		}
 		break;
 
