@@ -5,7 +5,6 @@ zephyr_include_directories(../../../include)
 zephyr_library()
 
 zephyr_library_sources(
-  greybus-stubs.c
   greybus-core.c
   greybus_messages.c
   greybus_transport.c
