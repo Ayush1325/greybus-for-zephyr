@@ -33,16 +33,40 @@
 #include <zephyr/types.h>
 #include <zephyr/devicetree.h>
 
-#define _GREYBUS_BASE_NODE DT_COMPAT_GET_ANY_STATUS_OKAY(zephyr_greybus)
+#define _GREYBUS_BASE_NODE DT_PATH(zephyr_greybus)
+
+#define _BUNDLE_PROP_LEN(node_id, cfg, prop)                                                       \
+	COND_CODE_1(cfg, (DT_PROP_LEN_OR(node_id, prop, 0)), (0))
+
+#define _GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id)                                             \
+	(_BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_GPIO, gpio_controllers) +                        \
+	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_I2C, i2c_controllers))
 
 #define _GREYBUS_CPORT_COUNTER(_node_id)                                                           \
-	COND_CODE_1(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle),                           \
-		    (DT_CHILD_NUM_STATUS_OKAY(_node_id)), (0))
+	COND_CODE_1(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle_bridged_phy),                \
+		    (_GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(_node_id)), (1))
 
 #define GREYBUS_CPORT_COUNT                                                                        \
-	(DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
+	(1 + DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
 
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
-void enable_cports(void);
+
+/**
+ * Write greybus manifest to the buffer. The buffer length should be >= GREYBUS_MANIFEST_SIZE
+ *
+ * @return size written if successful.
+ * @return -errno in case of error.
+ */
+int manifest_create(uint8_t buf[], size_t len);
+
+/**
+ * Get greybus manifest size.
+ */
+size_t manifest_size(void);
+
+/**
+ * Print greybus manifest to stdout. Intended for debugging.
+ */
+void manifest_print(uint8_t buf[]);
 
 #endif

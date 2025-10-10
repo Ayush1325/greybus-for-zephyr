@@ -37,7 +37,6 @@
 #include <greybus-utils/manifest.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
-#include "platform/manifest.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(greybus_control, CONFIG_GREYBUS_LOG_LEVEL);
@@ -229,8 +228,10 @@ static void gb_control_timesync_get_last_event(uint16_t cport, struct gb_message
 	gb_transport_message_empty_response_send(req, gb_errno_to_op_result(retval), cport);
 }
 
-static void gb_control_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
+static void gb_control_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
+	ARG_UNUSED(priv);
+
 	switch (gb_message_type(msg)) {
 	case GB_CONTROL_TYPE_PROTOCOL_VERSION:
 		return gb_control_protocol_version(cport, msg);
@@ -270,15 +271,6 @@ static void gb_control_handler(struct gb_driver *drv, struct gb_message *msg, ui
 	}
 }
 
-struct gb_driver control_driver = {
+struct gb_driver gb_control_driver = {
 	.op_handler = gb_control_handler,
 };
-
-void gb_control_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &control_driver);
-	unipro_attr_local_write(T_CPORTFLAGS,
-				CPORT_FLAGS_CSV_N | CPORT_FLAGS_CSD_N | CPORT_FLAGS_E2EFC, cport);
-	unipro_enable_fct_tx_flow(cport);
-	gb_listen(cport);
-}

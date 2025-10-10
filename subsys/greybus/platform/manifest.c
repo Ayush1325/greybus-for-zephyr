@@ -40,12 +40,14 @@ struct greybus_manifest_cport {
 #define _GREYBUS_MANIFEST_BUNDLES_SIZE(n) (GREYBUS_MANIFEST_BUNDLE_SIZE * n)
 #define _GREYBUS_MANIFEST_CPORTS_SIZE(n)  (GREYBUS_MANIFEST_CPORT_SIZE * n)
 
-#define GREYBUS_BUNDLE_HANDLER(node_id)                                                            \
-	IF_ENABLED(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle),                             \
-		   (DT_PROP(node_id, bundle_class), ))
+#define _GB_BUNDLE_CB(node_id)                                                                     \
+	COND_CODE_1(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle_bridged_phy),                \
+		    (GREYBUS_CLASS_BRIDGED_PHY), (EMPTY))
 
+/* Position = Bundle ID. Value = Class */
 static uint8_t bundles[] = {
-	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GREYBUS_BUNDLE_HANDLER)};
+	GREYBUS_CLASS_CONTROL,
+	DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GB_BUNDLE_CB, (, ))};
 
 #define GREYBUS_MANIFEST_SIZE                                                                      \
 	(sizeof(struct greybus_manifest_header) + GREYBUS_MANIFEST_INTERFACE_SIZE +                \
@@ -158,4 +160,50 @@ int manifest_create(uint8_t buf[], size_t len)
 	}
 
 	return manifest_size();
+}
+
+void manifest_print(uint8_t buf[])
+{
+	size_t i;
+	size_t current_offset = 0;
+	struct greybus_descriptor *desc;
+	struct greybus_manifest *mnfb = (struct greybus_manifest *)buf;
+
+	printk("[manifest-header]\n");
+	printk("version-major = %u\n", mnfb->header.version_major);
+	printk("version-minor = %u\n", mnfb->header.version_minor);
+
+	current_offset += sizeof(struct greybus_manifest_header);
+
+	for (i = 0; current_offset < mnfb->header.size; i++) {
+		desc = (struct greybus_descriptor *)(buf + current_offset);
+
+		printk("\n");
+
+		switch (desc->header.type) {
+		case GREYBUS_TYPE_INTERFACE:
+			printk("[interface-descriptor]\n");
+			printk("vendor-string-id = 0x%01x\n", desc->interface.vendor_stringid);
+			printk("product-string-id = 0x%01x\n", desc->interface.product_stringid);
+			break;
+		case GREYBUS_TYPE_STRING:
+			printk("[string-descriptor 0x%01x]\n", desc->string.id);
+			printk("string = %.*s\n", desc->string.length, desc->string.string);
+			break;
+		case GREYBUS_TYPE_BUNDLE:
+			printk("[bundle-descriptor 0x%01x]\n", desc->bundle.id);
+			printk("class = 0x%01x\n", desc->bundle.class);
+			break;
+		case GREYBUS_TYPE_CPORT:
+			printk("[cport-descriptor 0x%01x]\n", desc->cport.id);
+			printk("bundle = 0x%01x\n", desc->cport.bundle);
+			printk("protocol = 0x%01x\n", desc->cport.protocol_id);
+			break;
+		default:
+			printk("Invalid Greybus Descriptor\n");
+			return;
+		}
+
+		current_offset += desc->header.size;
+	}
 }

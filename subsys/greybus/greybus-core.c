@@ -119,13 +119,13 @@ uint8_t gb_errno_to_op_result(int err)
 
 static void gb_process_msg(struct gb_message *msg, uint16_t cport)
 {
-	struct gb_driver *drv = gb_cport_get(cport)->driver;
+	struct gb_cport *cport_ptr = gb_cport_get(cport);
 
 	if (gb_message_type(msg) == GB_PING_TYPE) {
 		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 	}
 
-	drv->op_handler(drv, msg, cport);
+	cport_ptr->driver->op_handler(cport_ptr->priv, msg, cport);
 }
 
 static void gb_pending_message_worker(void *p1, void *p2, void *p3)
@@ -186,48 +186,6 @@ int gb_unregister_driver(unsigned int cport)
 		cport_ptr->driver->exit(cport);
 	}
 	cport_ptr->driver = NULL;
-
-	return 0;
-}
-
-int _gb_register_driver(unsigned int cport, int bundle_id, struct gb_driver *driver)
-{
-	struct gb_cport *cport_ptr;
-	int retval;
-
-	LOG_DBG("Registering Greybus driver on CP%u", cport);
-
-	if (!driver) {
-		LOG_ERR("No driver to register");
-		return -EINVAL;
-	}
-
-	cport_ptr = gb_cport_get(cport);
-	if (!cport_ptr) {
-		LOG_ERR("Invalid cport number %u", cport);
-		return -EINVAL;
-	}
-
-	if (cport_ptr->driver) {
-		LOG_ERR("%s is already registered for CP%u", gb_driver_name(cport_ptr->driver),
-			cport);
-		return -EEXIST;
-	}
-
-	if (!driver->op_handler) {
-		LOG_ERR("Invalid driver");
-		return -EINVAL;
-	}
-
-	if (driver->init) {
-		retval = driver->init(cport);
-		if (retval) {
-			LOG_ERR("Can not init %s", gb_driver_name(driver));
-			return retval;
-		}
-	}
-
-	cport_ptr->driver = driver;
 
 	return 0;
 }

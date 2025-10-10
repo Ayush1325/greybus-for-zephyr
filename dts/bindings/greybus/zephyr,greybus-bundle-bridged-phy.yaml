@@ -1,0 +1,17 @@
+# Copyright (c) 2025, Ayush Singh BeagleBoard.org
+# SPDX-License-Identifier: Apache-2.0
+
+description: Greybus Bundle for class Bridged PHY
+
+compatible: "zephyr,greybus-bundle-bridged-phy"
+
+include: [base.yaml]
+
+properties:
+  gpio-controllers:
+    type: phandles
+    description: GPIO controllers in the bundle
+
+  i2c-controllers:
+    type: phandles
+    description: I2C controllers in the bundle

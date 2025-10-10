@@ -415,9 +415,9 @@ out:
 	gb_transport_message_empty_response_send(req, errcode, cport);
 }
 
-static void gb_spi_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
+static void gb_spi_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	const struct device *dev = gb_cport_to_device(cport);
+	const struct device *dev = priv;
 
 	switch (gb_message_type(msg)) {
 	case GB_SPI_PROTOCOL_VERSION:
@@ -434,17 +434,6 @@ static void gb_spi_handler(struct gb_driver *drv, struct gb_message *msg, uint16
 	}
 }
 
-static struct gb_driver gb_spi_driver = {
+struct gb_driver gb_spi_driver = {
 	.op_handler = gb_spi_handler,
 };
-
-/**
- * @brief Register Greybus SPI protocol
- *
- * @param cport CPort number
- * @param bundle Bundle number.
- */
-void gb_spi_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &gb_spi_driver);
-}

@@ -157,26 +157,23 @@ free_requests:
 	return gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_i2c_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
+static void gb_i2c_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
+	const struct device *dev = priv;
+
 	switch (gb_message_type(msg)) {
 	case GB_I2C_PROTOCOL_VERSION:
 		return gb_i2c_protocol_version(cport, msg);
 	case GB_I2C_PROTOCOL_FUNCTIONALITY:
 		return gb_i2c_protocol_functionality(cport, msg);
 	case GB_I2C_PROTOCOL_TRANSFER:
-		return gb_i2c_protocol_transfer(cport, msg, gb_cport_to_device(cport));
+		return gb_i2c_protocol_transfer(cport, msg, dev);
 	default:
 		LOG_ERR("Invalid type");
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 	}
 }
 
-static struct gb_driver gb_i2c_driver = {
+struct gb_driver gb_i2c_driver = {
 	.op_handler = gb_i2c_handler,
 };
-
-void gb_i2c_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &gb_i2c_driver);
-}

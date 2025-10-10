@@ -35,6 +35,7 @@
 #include <zephyr/sys/byteorder.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
+#include "greybus_gpio.h"
 
 #if defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) || defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) ||        \
 	defined(CONFIG_BOARD_NRF52_BSIM)
@@ -275,33 +276,6 @@ static void gb_gpio_irq_unmask(uint16_t cport, struct gb_message *req, const str
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-int gb_gpio_irq_event(int irq, void *context, void *priv)
-{
-	struct gb_message *req;
-	const struct gb_gpio_irq_event_request req_data = {
-		.which = irq,
-	};
-	const struct device *dev = (const struct device *)context;
-	int cport = gb_device_to_cport(dev);
-
-	if (cport < 0) {
-		return -EINVAL;
-	}
-
-	req = gb_message_request_alloc(&req_data, sizeof(req_data), GB_GPIO_TYPE_IRQ_EVENT, true);
-	if (!req) {
-		return -1;
-	}
-
-	/* Host is responsible for unmasking. */
-	gpio_pin_interrupt_configure(dev, req_data.which, GPIO_INT_MODE_DISABLED);
-
-	gb_transport_message_send(req, cport);
-	gb_message_dealloc(req);
-
-	return OK;
-}
-
 static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
 	int ret;
@@ -354,48 +328,43 @@ static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struc
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
-static void gb_gpio_handler(struct gb_driver *drv, struct gb_message *msg, uint16_t cport)
+static void gb_gpio_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	const struct device *dev = gb_cport_to_device(cport);
+	const struct gb_gpio_driver_data *data = priv;
 
 	switch (gb_message_type(msg)) {
 	case GB_GPIO_TYPE_PROTOCOL_VERSION:
 		return gb_gpio_protocol_version(cport, msg);
 	case GB_GPIO_TYPE_LINE_COUNT:
-		return gb_gpio_line_count(cport, msg, dev);
+		return gb_gpio_line_count(cport, msg, data->dev);
 	case GB_GPIO_TYPE_ACTIVATE:
-		return gb_gpio_activate(cport, msg, dev);
+		return gb_gpio_activate(cport, msg, data->dev);
 	case GB_GPIO_TYPE_DEACTIVATE:
-		return gb_gpio_deactivate(cport, msg, dev);
+		return gb_gpio_deactivate(cport, msg, data->dev);
 	case GB_GPIO_TYPE_GET_DIRECTION:
-		return gb_gpio_get_direction(cport, msg, dev);
+		return gb_gpio_get_direction(cport, msg, data->dev);
 	case GB_GPIO_TYPE_DIRECTION_IN:
-		return gb_gpio_direction_in(cport, msg, dev);
+		return gb_gpio_direction_in(cport, msg, data->dev);
 	case GB_GPIO_TYPE_DIRECTION_OUT:
-		return gb_gpio_direction_out(cport, msg, dev);
+		return gb_gpio_direction_out(cport, msg, data->dev);
 	case GB_GPIO_TYPE_GET_VALUE:
-		return gb_gpio_get_value(cport, msg, dev);
+		return gb_gpio_get_value(cport, msg, data->dev);
 	case GB_GPIO_TYPE_SET_VALUE:
-		return gb_gpio_set_value(cport, msg, dev);
+		return gb_gpio_set_value(cport, msg, data->dev);
 	case GB_GPIO_TYPE_SET_DEBOUNCE:
-		return gb_gpio_set_debounce(cport, msg, dev);
+		return gb_gpio_set_debounce(cport, msg, data->dev);
 	case GB_GPIO_TYPE_IRQ_TYPE:
-		return gb_gpio_irq_type(cport, msg, dev);
+		return gb_gpio_irq_type(cport, msg, data->dev);
 	case GB_GPIO_TYPE_IRQ_MASK:
-		return gb_gpio_irq_mask(cport, msg, dev);
+		return gb_gpio_irq_mask(cport, msg, data->dev);
 	case GB_GPIO_TYPE_IRQ_UNMASK:
-		return gb_gpio_irq_unmask(cport, msg, dev);
+		return gb_gpio_irq_unmask(cport, msg, data->dev);
 	default:
 		LOG_ERR("Invalid type");
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 	}
 }
 
-struct gb_driver gpio_driver = {
+struct gb_driver gb_gpio_driver = {
 	.op_handler = gb_gpio_handler,
 };
-
-void gb_gpio_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &gpio_driver);
-}

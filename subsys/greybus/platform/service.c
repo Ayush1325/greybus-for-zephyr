@@ -12,11 +12,11 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <zephyr/kernel.h>
+#include "../greybus_transport.h"
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(greybus_service, CONFIG_GREYBUS_LOG_LEVEL);
 
-#include "transport.h"
 #include "certificate.h"
 
 /* Currently only one greybus instance is supported */
@@ -62,7 +62,6 @@ static int greybus_service_init(void)
 		goto clear_mnfb;
 	}
 
-	enable_cports();
 	LOG_INF("Greybus is active");
 	return 0;
 
