@@ -84,7 +84,7 @@ struct gb_driver {
 	 * in bundle->priv. The same bundle object will be passed to the driver in
 	 * all subsequent greybus handler callbacks calls.
 	 */
-	int (*init)(const void *priv);
+	int (*init)(const void *priv, uint16_t cport);
 	/*
 	 * This function is called upon driver deregistration. All private data
 	 * stored in bundle should be freed and struct device should be closed.

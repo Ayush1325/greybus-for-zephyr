@@ -193,8 +193,15 @@ int gb_stop_listening(uint16_t cport)
 
 int gb_init(struct gb_transport_backend *transport)
 {
+	int ret;
+
 	if (!transport) {
 		return -EINVAL;
+	}
+
+	ret = gb_cports_init();
+	if (ret < 0) {
+		return ret;
 	}
 
 	gb_rx_threadid = k_thread_create(
@@ -215,6 +222,8 @@ void gb_deinit(void)
 	}
 
 	k_thread_abort(gb_rx_threadid);
+
+	gb_cports_deinit();
 
 	if (transport->exit) {
 		transport->exit();

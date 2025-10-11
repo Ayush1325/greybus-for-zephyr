@@ -18,4 +18,11 @@ struct gb_cport {
 
 struct gb_cport *gb_cport_get(uint16_t cport);
 
+/**
+ * Initialize all cports.
+ */
+int gb_cports_init();
+
+void gb_cports_deinit();
+
 #endif // _GREYBUS_CPORT_H_

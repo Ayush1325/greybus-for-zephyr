@@ -315,6 +315,61 @@ static void gb_gpio_handler(const void *priv, struct gb_message *msg, uint16_t c
 	}
 }
 
+struct gpio_irq_event_request_msg {
+	struct gb_operation_hdr hdr;
+	struct gb_gpio_irq_event_request body;
+} __packed;
+
+static void gpio_callback_handler(const struct device *port, struct gpio_callback *cb,
+				  gpio_port_pins_t pins)
+{
+	int ret;
+	size_t i;
+	struct gb_gpio_driver_data *data = CONTAINER_OF(cb, struct gb_gpio_driver_data, cb);
+	struct gpio_irq_event_request_msg msg = {0};
+
+	msg.hdr.size = sys_cpu_to_le16(sizeof(msg));
+	msg.hdr.type = GB_GPIO_TYPE_IRQ_EVENT;
+
+	for (i = 0; i < GPIO_MAX_PINS_PER_PORT && pins != 0; ++i, pins >>= 1) {
+		if (pins & 1) {
+			msg.body.which = i;
+			ret = gb_transport_message_send((const struct gb_message *)&msg,
+							data->cport);
+			if (ret < 0) {
+				LOG_ERR("GPIO irq send failed: %d", ret);
+			}
+		}
+	}
+}
+
+static int gb_gpio_init(const void *priv, uint16_t cport)
+{
+	int ret;
+	struct gb_gpio_driver_data *data = (struct gb_gpio_driver_data *)priv;
+	const struct gpio_driver_config *cfg = (const struct gpio_driver_config *)data->dev->config;
+
+	data->cport = cport;
+	gpio_init_callback(&data->cb, gpio_callback_handler, cfg->port_pin_mask);
+
+	ret = gpio_add_callback(data->dev, &data->cb);
+	if (ret < 0) {
+		LOG_ERR("Failed to add gpio callback");
+		return ret;
+	}
+
+	return 0;
+}
+
+static void gb_gpio_exit(const void *priv)
+{
+	struct gb_gpio_driver_data *data = (struct gb_gpio_driver_data *)priv;
+
+	gpio_remove_callback(data->dev, &data->cb);
+}
+
 struct gb_driver gb_gpio_driver = {
+	.init = gb_gpio_init,
+	.exit = gb_gpio_exit,
 	.op_handler = gb_gpio_handler,
 };
