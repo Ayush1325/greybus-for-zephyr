@@ -43,11 +43,19 @@
 	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_I2C, i2c_controllers))
 
 #define _GREYBUS_CPORT_COUNTER(_node_id)                                                           \
-	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_bridged_phy, okay),   \
+	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_bridged_phy, okay),  \
 		    (_GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(_node_id)), (1))
 
+/* 
+ * Handler for cports and bundles that do not exist in DT.
+ * - Control
+ * - Loopback
+ */
+#define _GREYBUS_SPECIAL_CPORTS (1 + COND_CODE_1(CONFIG_GREYBUS_LOOPBACK, (1), (0)))
+
 #define GREYBUS_CPORT_COUNT                                                                        \
-	(1 + DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
+	(_GREYBUS_SPECIAL_CPORTS +                                                                 \
+	 DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
 
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
 
