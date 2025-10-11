@@ -169,7 +169,8 @@ config GREYBUS_CAMERA
 
 config GREYBUS_GPIO
 	bool "Greybus GPIO"
-	select GPIO_GET_DIRECTION
+	depends on GPIO
+	depends on GPIO_GET_DIRECTION
 	help
 	  Select this for Greybus GPIO support.
 

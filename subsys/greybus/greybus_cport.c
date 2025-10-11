@@ -28,7 +28,8 @@ enum {
 	};
 
 #define GB_GPIO_PRIV_DATA_HANDLER(_node_id)                                                        \
-	DT_FOREACH_PROP_ELEM(_node_id, gpio_controllers, GB_GPIO_PRIV_DATA)
+	IF_ENABLED(CONFIG_GREYBUS_GPIO,                                                            \
+		   (DT_FOREACH_PROP_ELEM(_node_id, gpio_controllers, GB_GPIO_PRIV_DATA)))
 
 #define GB_PRIV_DATA_HANDLER(_node_id)                                                             \
 	IF_ENABLED(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle_bridged_phy),                \
