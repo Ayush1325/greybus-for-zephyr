@@ -4,13 +4,12 @@
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 
-#include "certificate.h"
+#include "../platform/certificate.h"
 #include "../greybus_messages.h"
 
 LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 
 #define GB_TRANSPORT_TCPIP_BASE_PORT 4242
-#define GB_TRANSPORT_TCPIP_BACKLOG   10
 
 #ifndef CONFIG_GREYBUS_ENABLE_TLS
 #define CONFIG_GREYBUS_TLS_HOSTNAME ""
@@ -19,7 +18,7 @@ LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 /* Based on UniPro, from Linux */
 #define CPORT_ID_MAX 4095
 
-#define GB_TRANS_RX_STACK_SIZE     2048
+#define GB_TRANS_RX_STACK_SIZE     1024
 #define GB_TRANS_RX_STACK_PRIORITY 6
 
 #ifdef CONFIG_GREYBUS_ENABLE_TLS
@@ -130,14 +129,6 @@ early_exit:
 	return msg;
 }
 
-static void gb_trans_init(void)
-{
-}
-
-static void gb_trans_exit(void)
-{
-}
-
 static int gb_trans_listen_start(uint16_t cport)
 {
 	return 0;
@@ -166,14 +157,6 @@ static int gb_trans_send(uint16_t cport, const struct gb_message *msg)
 	ret = write_data(ctx.client_sock, msg, sys_le16_to_cpu(msg->header.size));
 	return MIN(0, ret);
 }
-
-static const struct gb_transport_backend gb_trans_backend = {
-	.init = gb_trans_init,
-	.exit = gb_trans_exit,
-	.listen = gb_trans_listen_start,
-	.stop_listening = gb_trans_listen_stop,
-	.send = gb_trans_send,
-};
 
 static int netsetup()
 {
@@ -263,7 +246,8 @@ static int netsetup()
 		return -errno;
 	}
 
-	ret = zsock_listen(sock, GB_TRANSPORT_TCPIP_BACKLOG);
+	/* We will only ever be connected to a single ap */
+	ret = zsock_listen(sock, 1);
 	if (ret < 0) {
 		LOG_ERR("listen: %d", errno);
 		return -errno;
@@ -362,17 +346,13 @@ static void gb_trans_rx_thread_handler(void *p1, void *p2, void *p3)
 	}
 }
 
-struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports)
+static int gb_trans_init(void)
 {
-	if (num_cports >= CPORT_ID_MAX) {
-		LOG_ERR("invalid number of cports %u", (unsigned)num_cports);
-		return NULL;
-	}
-
 	ctx.server_sock = netsetup();
+
 	if (ctx.server_sock < 0) {
 		LOG_ERR("Failed to setup base TCP port");
-		return NULL;
+		return -ESOCKTNOSUPPORT;
 	}
 	ctx.client_sock = -1;
 
@@ -380,5 +360,20 @@ struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports)
 			gb_trans_rx_thread_handler, NULL, NULL, NULL, GB_TRANS_RX_STACK_PRIORITY, 0,
 			K_NO_WAIT);
 
-	return (struct gb_transport_backend *)&gb_trans_backend;
+	return 0;
 }
+
+static void gb_trans_exit(void)
+{
+	k_thread_abort(&ctx.rx_thread);
+	zsock_close(ctx.server_sock);
+	zsock_close(ctx.client_sock);
+}
+
+const struct gb_transport_backend gb_trans_backend = {
+	.init = gb_trans_init,
+	.exit = gb_trans_exit,
+	.listen = gb_trans_listen_start,
+	.stop_listening = gb_trans_listen_stop,
+	.send = gb_trans_send,
+};

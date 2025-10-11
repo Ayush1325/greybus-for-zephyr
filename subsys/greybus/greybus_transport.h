@@ -9,6 +9,8 @@
 
 #include "greybus_messages.h"
 
+extern const struct gb_transport_backend gb_trans_backend;
+
 /**
  * Send message to AP.
  *
@@ -73,13 +75,11 @@ static inline void gb_transport_message_empty_response_send(struct gb_message *r
 }
 
 /**
- * Intialize a greybus transport backend
- */
-struct gb_transport_backend *gb_transport_backend_init(uint16_t num_cports);
-
-/**
  * Get the current greybus transport backend
  */
-const struct gb_transport_backend *gb_transport_get_backend(void);
+static inline const struct gb_transport_backend *gb_transport_get_backend(void)
+{
+	return &gb_trans_backend;
+}
 
 #endif // _GREYBUS_TRANSPORT_H_

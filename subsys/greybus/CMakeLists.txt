@@ -33,12 +33,9 @@ if(CONFIG_GREYBUS_TLS_BUILTIN)
     ${gen_dir}/greybus_tls_builtin_server_privkey.inc)
 endif()
 
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP
-                             platform/transport-tcpip.c)
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART
-                             platform/transport-uart.c)
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_DUMMY
-                             platform/transport-dummy.c)
+zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP transport/tcpip.c)
+zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART transport/uart.c)
+zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_DUMMY transport/dummy.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_AUDIO audio.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_CAMERA camera.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_GPIO gpio.c)

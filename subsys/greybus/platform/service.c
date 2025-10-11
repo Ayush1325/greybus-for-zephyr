@@ -19,24 +19,10 @@ LOG_MODULE_REGISTER(greybus_service, CONFIG_GREYBUS_LOG_LEVEL);
 
 #include "certificate.h"
 
-/* Currently only one greybus instance is supported */
-#define GREYBUS_BUS_NAME "greybus0"
-
-static struct gb_transport_backend *xport;
-
-const struct gb_transport_backend *gb_transport_get_backend(void)
-{
-	return xport;
-}
-
 static int greybus_service_init(void)
 {
 	int r;
-
-	if (xport != NULL) {
-		LOG_ERR("service already initialized");
-		return -EALREADY;
-	}
+	const struct gb_transport_backend *xport = gb_transport_get_backend();
 
 	r = greybus_tls_init();
 	if (r < 0) {
@@ -50,13 +36,7 @@ static int greybus_service_init(void)
 		return -EINVAL;
 	}
 
-	xport = gb_transport_backend_init(GREYBUS_CPORT_COUNT);
-	if (xport == NULL) {
-		LOG_ERR("failed to get transport");
-		return -EIO;
-	}
-
-	r = gb_init((struct gb_transport_backend *)xport);
+	r = gb_init(xport);
 	if (r < 0) {
 		LOG_ERR("gb_init() failed: %d", r);
 		goto clear_mnfb;
