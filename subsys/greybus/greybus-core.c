@@ -28,25 +28,22 @@
  * Author: Fabien Parent <fparent@baylibre.com>
  */
 #include <zephyr/kernel.h>
-
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/byteorder.h>
 #include "greybus_cport.h"
 #include <greybus/greybus.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
-#include <zephyr/logging/log.h>
-
 #include <greybus-utils/manifest.h>
-
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/byteorder.h>
 
 LOG_MODULE_REGISTER(greybus, CONFIG_GREYBUS_LOG_LEVEL);
 
 #define GB_PING_TYPE 0x00
 
-K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), 10, 1);
+/* 2 msg per cport seems to be a good number */
+K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), GREYBUS_CPORT_COUNT * 2, 1);
 
-K_THREAD_STACK_DEFINE(gb_rx_thread_stack, 1536);
+K_THREAD_STACK_DEFINE(gb_rx_thread_stack, 1280);
 static struct k_thread gb_rx_thread;
 static k_tid_t gb_rx_threadid;
 
