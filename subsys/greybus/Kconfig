@@ -181,6 +181,7 @@ config GREYBUS_HID
 
 config GREYBUS_I2C
 	bool "Greybus I2C"
+	depends on I2C
 	help
 	  Select this for Greybus I2C support.
 
