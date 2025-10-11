@@ -33,20 +33,6 @@ config GREYBUS_HEAP_MEM_POOL_SIZE
 	help
 	  Heap memory pre-allocated for greybus subsystem
 
-choice
-	prompt "Greybus Manifest Source"
-	default GREYBUS_MANIFEST_BUILTIN
-
-config GREYBUS_MANIFEST_BUILTIN
-	bool "Compile the manifest into the application"
-	help
-	  Choosing this option generates a Greybus Manifest
-	  Source file from the unfixed DeviceTree header,
-	  converts that into a Greybus Manifest Binary file,
-	  and then generates an array in C from the binary
-	  data.
-endchoice
-
 config GREYBUS_ENABLE_TLS
 	bool "Use Transport Layer Security (TLS)"
 	depends on TLS_CREDENTIALS
@@ -183,7 +169,8 @@ config GREYBUS_CAMERA
 
 config GREYBUS_GPIO
 	bool "Greybus GPIO"
-	select GPIO_GET_DIRECTION
+	depends on GPIO
+	depends on GPIO_GET_DIRECTION
 	help
 	  Select this for Greybus GPIO support.
 
@@ -194,6 +181,7 @@ config GREYBUS_HID
 
 config GREYBUS_I2C
 	bool "Greybus I2C"
+	depends on I2C
 	help
 	  Select this for Greybus I2C support.
 

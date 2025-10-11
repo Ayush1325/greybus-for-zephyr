@@ -40,9 +40,15 @@ struct greybus_manifest_cport {
 #define _GREYBUS_MANIFEST_BUNDLES_SIZE(n) (GREYBUS_MANIFEST_BUNDLE_SIZE * n)
 #define _GREYBUS_MANIFEST_CPORTS_SIZE(n)  (GREYBUS_MANIFEST_CPORT_SIZE * n)
 
+#define _GB_BUNDLE_BRIDGED_PHY_CHECK(node_id)                                                      \
+	UTIL_AND(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_bridged_phy, okay),      \
+		 UTIL_OR(COND_CODE_1(CONFIG_GREYBUS_GPIO,                                          \
+				     (DT_NODE_HAS_PROP(node_id, gpio_controllers)), (0)),          \
+			 COND_CODE_1(CONFIG_GREYBUS_I2C,                                           \
+				     (DT_NODE_HAS_PROP(node_id, i2c_controllers)), (0))))
+
 #define _GB_BUNDLE_CB(node_id)                                                                     \
-	COND_CODE_1(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle_bridged_phy),                \
-		    (GREYBUS_CLASS_BRIDGED_PHY), (EMPTY))
+	IF_ENABLED(_GB_BUNDLE_BRIDGED_PHY_CHECK(node_id), (GREYBUS_CLASS_BRIDGED_PHY))
 
 /* Position = Bundle ID. Value = Class */
 static uint8_t bundles[] = {
