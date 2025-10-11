@@ -15,6 +15,7 @@ LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 extern struct gb_driver gb_control_driver;
 extern struct gb_driver gb_gpio_driver;
 extern struct gb_driver gb_i2c_driver;
+extern struct gb_driver gb_loopback_driver;
 
 /* Reset the counter to 0 */
 enum {
@@ -74,6 +75,9 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 static struct gb_cport cports[] = {
 	/* cport0 is always control cport */
 	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_CONTROL, &gb_control_driver),
+#ifdef CONFIG_GREYBUS_LOOPBACK
+	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_LOOPBACK, &gb_loopback_driver),
+#endif // CONFIG_GREYBUS_LOOPBACK
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_CPORTS_IN_BUNDLE)};
 
 BUILD_ASSERT(GREYBUS_CPORT_COUNT == ARRAY_SIZE(cports));

@@ -53,6 +53,9 @@ struct greybus_manifest_cport {
 /* Position = Bundle ID. Value = Class */
 static uint8_t bundles[] = {
 	GREYBUS_CLASS_CONTROL,
+#ifdef CONFIG_GREYBUS_LOOPBACK
+	GREYBUS_CLASS_LOOPBACK,
+#endif // CONFIG_GREYBUS_LOOPBACK
 	DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GB_BUNDLE_CB, (, ))};
 
 #define GREYBUS_MANIFEST_SIZE                                                                      \
