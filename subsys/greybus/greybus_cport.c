@@ -81,3 +81,39 @@ struct gb_cport *gb_cport_get(uint16_t cport)
 {
 	return (cport >= GREYBUS_CPORT_COUNT) ? NULL : &cports[cport];
 }
+
+int gb_cports_init()
+{
+	size_t i;
+	int ret;
+	const struct gb_cport *cport;
+
+	for (i = 0; i < ARRAY_SIZE(cports); ++i) {
+		cport = &cports[i];
+
+		if (cport->driver->init) {
+			ret = cport->driver->init(cport->priv, i);
+			if (ret < 0) {
+				LOG_ERR("Failed to initialize cport %u", i);
+				return ret;
+			}
+		}
+	}
+
+	return 0;
+}
+
+void gb_cports_deinit()
+{
+
+	size_t i;
+	const struct gb_cport *cport;
+
+	for (i = 0; i < ARRAY_SIZE(cports); ++i) {
+		cport = &cports[i];
+
+		if (cport->driver->exit) {
+			cport->driver->exit(cport->priv);
+		}
+	}
+}

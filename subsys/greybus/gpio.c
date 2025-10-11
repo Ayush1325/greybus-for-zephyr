@@ -101,13 +101,9 @@ static void gb_gpio_deactivate(uint16_t cport, struct gb_message *req, const str
 
 static void gb_gpio_get_direction(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	const struct gpio_driver_config *cfg;
 	struct gb_gpio_get_direction_response resp_data;
 	const struct gb_gpio_get_direction_request *request =
 		(const struct gb_gpio_get_direction_request *)req->payload;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -121,13 +117,9 @@ static void gb_gpio_get_direction(uint16_t cport, struct gb_message *req, const 
 
 static void gb_gpio_direction_in(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	const struct gpio_driver_config *cfg;
+	uint8_t ret;
 	const struct gb_gpio_direction_in_request *request =
 		(const struct gb_gpio_direction_in_request *)req->payload;
-	uint8_t ret;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -142,12 +134,8 @@ static void gb_gpio_direction_in(uint16_t cport, struct gb_message *req, const s
 static void gb_gpio_direction_out(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
 	int ret;
-	const struct gpio_driver_config *cfg;
 	const struct gb_gpio_direction_out_request *request =
 		(const struct gb_gpio_direction_out_request *)req->payload;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -166,13 +154,9 @@ static void gb_gpio_direction_out(uint16_t cport, struct gb_message *req, const 
 
 static void gb_gpio_get_value(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	const struct gpio_driver_config *cfg;
 	struct gb_gpio_get_value_response resp_data;
 	const struct gb_gpio_get_value_request *request =
 		(const struct gb_gpio_get_value_request *)req->payload;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -185,13 +169,9 @@ static void gb_gpio_get_value(uint16_t cport, struct gb_message *req, const stru
 
 static void gb_gpio_set_value(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	int ret;
-	const struct gpio_driver_config *cfg;
+	uint8_t ret;
 	const struct gb_gpio_set_value_request *request =
 		(const struct gb_gpio_set_value_request *)req->payload;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -204,17 +184,14 @@ static void gb_gpio_set_value(uint16_t cport, struct gb_message *req, const stru
 
 static void gb_gpio_set_debounce(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	int ret = GB_OP_SUCCESS;
-	int flags = 0;
-	const struct gpio_driver_config *cfg;
+	uint8_t ret = GB_OP_SUCCESS;
+	gpio_flags_t flags = 0;
 	const struct gb_gpio_set_debounce_request *request =
 		(const struct gb_gpio_set_debounce_request *)req->payload;
 
 #ifdef DT_HAS_TI_CC13XX_CC26XX_GPIO_ENABLED
 	flags = CC13XX_CC26XX_GPIO_DEBOUNCE;
 #endif
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -231,13 +208,9 @@ static void gb_gpio_set_debounce(uint16_t cport, struct gb_message *req, const s
 
 static void gb_gpio_irq_mask(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	int ret;
-	const struct gpio_driver_config *cfg;
+	uint8_t ret;
 	const struct gb_gpio_irq_mask_request *request =
 		(const struct gb_gpio_irq_mask_request *)req->payload;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -251,13 +224,9 @@ static void gb_gpio_irq_mask(uint16_t cport, struct gb_message *req, const struc
 
 static void gb_gpio_irq_unmask(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	int ret;
-	const struct gpio_driver_config *cfg;
+	uint8_t ret;
 	const struct gb_gpio_irq_unmask_request *request =
 		(const struct gb_gpio_irq_unmask_request *)req->payload;
-
-	cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
 
 	if (gb_message_payload_len(req) < sizeof(*request)) {
 		LOG_ERR("dropping short message");
@@ -271,7 +240,7 @@ static void gb_gpio_irq_unmask(uint16_t cport, struct gb_message *req, const str
 
 static void gb_gpio_irq_type(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
-	int ret;
+	uint8_t ret;
 	gpio_flags_t flags;
 	const struct gb_gpio_irq_type_request *request =
 		(const struct gb_gpio_irq_type_request *)req->payload;
@@ -346,6 +315,61 @@ static void gb_gpio_handler(const void *priv, struct gb_message *msg, uint16_t c
 	}
 }
 
+struct gpio_irq_event_request_msg {
+	struct gb_operation_hdr hdr;
+	struct gb_gpio_irq_event_request body;
+} __packed;
+
+static void gpio_callback_handler(const struct device *port, struct gpio_callback *cb,
+				  gpio_port_pins_t pins)
+{
+	int ret;
+	size_t i;
+	struct gb_gpio_driver_data *data = CONTAINER_OF(cb, struct gb_gpio_driver_data, cb);
+	struct gpio_irq_event_request_msg msg = {0};
+
+	msg.hdr.size = sys_cpu_to_le16(sizeof(msg));
+	msg.hdr.type = GB_GPIO_TYPE_IRQ_EVENT;
+
+	for (i = 0; i < GPIO_MAX_PINS_PER_PORT && pins != 0; ++i, pins >>= 1) {
+		if (pins & 1) {
+			msg.body.which = i;
+			ret = gb_transport_message_send((const struct gb_message *)&msg,
+							data->cport);
+			if (ret < 0) {
+				LOG_ERR("GPIO irq send failed: %d", ret);
+			}
+		}
+	}
+}
+
+static int gb_gpio_init(const void *priv, uint16_t cport)
+{
+	int ret;
+	struct gb_gpio_driver_data *data = (struct gb_gpio_driver_data *)priv;
+	const struct gpio_driver_config *cfg = (const struct gpio_driver_config *)data->dev->config;
+
+	data->cport = cport;
+	gpio_init_callback(&data->cb, gpio_callback_handler, cfg->port_pin_mask);
+
+	ret = gpio_add_callback(data->dev, &data->cb);
+	if (ret < 0) {
+		LOG_ERR("Failed to add gpio callback");
+		return ret;
+	}
+
+	return 0;
+}
+
+static void gb_gpio_exit(const void *priv)
+{
+	struct gb_gpio_driver_data *data = (struct gb_gpio_driver_data *)priv;
+
+	gpio_remove_callback(data->dev, &data->cb);
+}
+
 struct gb_driver gb_gpio_driver = {
+	.init = gb_gpio_init,
+	.exit = gb_gpio_exit,
 	.op_handler = gb_gpio_handler,
 };
