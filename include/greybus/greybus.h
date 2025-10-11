@@ -65,7 +65,7 @@ struct gb_msg_with_cport {
 };
 
 struct gb_transport_backend {
-	void (*init)(void);
+	int (*init)(void);
 	void (*exit)(void);
 	int (*listen)(uint16_t cport);
 	int (*stop_listening)(uint16_t cport);
@@ -124,7 +124,7 @@ enum gb_operation_result {
 	GB_OP_INTERNAL = 0xff,
 };
 
-int gb_init(struct gb_transport_backend *transport);
+int gb_init(const struct gb_transport_backend *transport);
 void gb_deinit(void);
 
 int gb_listen(uint16_t cport);

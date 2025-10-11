@@ -45,7 +45,6 @@ K_MSGQ_DEFINE(gb_rx_msgq, sizeof(struct gb_msg_with_cport), GREYBUS_CPORT_COUNT 
 
 K_THREAD_STACK_DEFINE(gb_rx_thread_stack, 1280);
 static struct k_thread gb_rx_thread;
-static k_tid_t gb_rx_threadid;
 
 uint8_t gb_errno_to_op_result(int err)
 {
@@ -188,7 +187,7 @@ int gb_stop_listening(uint16_t cport)
 	return transport->stop_listening(cport);
 }
 
-int gb_init(struct gb_transport_backend *transport)
+int gb_init(const struct gb_transport_backend *transport)
 {
 	int ret;
 
@@ -201,9 +200,9 @@ int gb_init(struct gb_transport_backend *transport)
 		return ret;
 	}
 
-	gb_rx_threadid = k_thread_create(
-		&gb_rx_thread, gb_rx_thread_stack, K_THREAD_STACK_SIZEOF(gb_rx_thread_stack),
-		gb_pending_message_worker, NULL, NULL, NULL, 5, 0, K_NO_WAIT);
+	k_thread_create(&gb_rx_thread, gb_rx_thread_stack,
+			K_THREAD_STACK_SIZEOF(gb_rx_thread_stack), gb_pending_message_worker, NULL,
+			NULL, NULL, 5, 0, K_NO_WAIT);
 
 	transport->init();
 
@@ -218,7 +217,7 @@ void gb_deinit(void)
 		return; /* gb not initialized */
 	}
 
-	k_thread_abort(gb_rx_threadid);
+	k_thread_abort(&gb_rx_thread);
 
 	gb_cports_deinit();
 
