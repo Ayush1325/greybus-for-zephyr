@@ -29,8 +29,7 @@
 #ifndef __LOOPBACK__H__
 #define __LOOPBACK__H__
 
-#include <nuttx/list.h>
-#include <nuttx/greybus/types.h>
+#include <greybus/types.h>
 
 /* Greybus loopback request types */
 #define GB_LOOPBACK_TYPE_NONE             0x00
@@ -64,30 +63,5 @@ struct gb_loopback_sync_transfer {
 	__le32 chksum;
 	__u8 data[0];
 };
-
-struct gb_loopback_statistics {
-	unsigned recv;
-	unsigned recv_err;
-
-	unsigned throughput_min;
-	unsigned throughput_max;
-	unsigned throughput_avg;
-
-	unsigned latency_min;
-	unsigned latency_max;
-	unsigned latency_avg;
-
-	unsigned reqs_per_sec_min;
-	unsigned reqs_per_sec_max;
-	unsigned reqs_per_sec_avg;
-};
-
-typedef int (*gb_loopback_cport_cb)(int, void *);
-
-int gb_loopback_get_cports(gb_loopback_cport_cb cb, void *data);
-int gb_loopback_send_req(int cport, size_t size, uint8_t type);
-int gb_loopback_get_stats(int cport, struct gb_loopback_statistics *stats);
-void gb_loopback_reset(int cport);
-int gb_loopback_cport_valid(int cport);
 
 #endif
