@@ -10,7 +10,6 @@
 LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 
 #define GB_TRANSPORT_TCPIP_BASE_PORT 4242
-#define GB_TRANSPORT_TCPIP_BACKLOG   10
 
 #ifndef CONFIG_GREYBUS_ENABLE_TLS
 #define CONFIG_GREYBUS_TLS_HOSTNAME ""
@@ -19,7 +18,7 @@ LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);
 /* Based on UniPro, from Linux */
 #define CPORT_ID_MAX 4095
 
-#define GB_TRANS_RX_STACK_SIZE     2048
+#define GB_TRANS_RX_STACK_SIZE     1024
 #define GB_TRANS_RX_STACK_PRIORITY 6
 
 #ifdef CONFIG_GREYBUS_ENABLE_TLS
@@ -263,7 +262,8 @@ static int netsetup()
 		return -errno;
 	}
 
-	ret = zsock_listen(sock, GB_TRANSPORT_TCPIP_BACKLOG);
+	/* We will only ever be connected to a single ap */
+	ret = zsock_listen(sock, 1);
 	if (ret < 0) {
 		LOG_ERR("listen: %d", errno);
 		return -errno;
