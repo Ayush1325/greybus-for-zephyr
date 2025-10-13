@@ -13,5 +13,11 @@
 			gpio-controllers = <&gpio0>;
 			i2c-controllers = <&sens_i2c>;
 		};
+
+		gbbundle2 {
+			status = "okay";
+			compatible = "zephyr,greybus-bundle-lights";
+			lights = <&leds>;
+		};
 	};
 };

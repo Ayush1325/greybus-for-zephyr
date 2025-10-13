@@ -36,6 +36,7 @@
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include "lights-gb.h"
+#include "greybus_lights.h"
 
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/led.h>
@@ -73,11 +74,12 @@ static void gb_lights_protocol_version(uint16_t cport, struct gb_message *req)
  * @param operation pointer to structure of Greybus operation message
  * @return GB_OP_SUCCESS on success, error code on failure
  */
-static void gb_lights_get_lights(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_lights_get_lights(uint16_t cport, struct gb_message *req,
+				 const struct gb_lights_driver_data *data)
 {
 	/* TODO: Add API in zephyr to get led count */
 	const struct gb_lights_get_lights_response resp_data = {
-		.lights_count = 1,
+		.lights_count = data->lights_num,
 	};
 
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
@@ -94,7 +96,7 @@ static void gb_lights_get_lights(uint16_t cport, struct gb_message *req, const s
  * @return GB_OP_SUCCESS on success, error code on failure
  */
 static void gb_lights_get_light_config(uint16_t cport, struct gb_message *req,
-				       const struct device *dev)
+				       const struct gb_lights_driver_data *data)
 {
 	const struct gb_lights_get_light_config_request *req_data =
 		(const struct gb_lights_get_light_config_request *)req->payload;
@@ -102,7 +104,7 @@ static void gb_lights_get_light_config(uint16_t cport, struct gb_message *req,
 	struct gb_lights_get_light_config_response resp_data;
 	int ret;
 
-	ret = led_get_info(dev, req_data->id, &info);
+	ret = led_get_info(data->devs[req_data->id], req_data->id, &info);
 	if (ret < 0) {
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
@@ -127,7 +129,7 @@ static void gb_lights_get_light_config(uint16_t cport, struct gb_message *req,
  * @return GB_OP_SUCCESS on success, error code on failure
  */
 static void gb_lights_get_channel_config(uint16_t cport, struct gb_message *req,
-					 const struct device *dev)
+					 const struct gb_lights_driver_data *data)
 {
 	/* TODO: Implement properly */
 	struct gb_lights_get_channel_config_response resp_data = {
@@ -151,14 +153,14 @@ static void gb_lights_get_channel_config(uint16_t cport, struct gb_message *req,
  * @return GB_OP_SUCCESS on success, error code on failure
  */
 static void gb_lights_set_brightness(uint16_t cport, struct gb_message *req,
-				     const struct device *dev)
+				     const struct gb_lights_driver_data *data)
 {
 	const struct gb_lights_set_brightness_request *req_data =
 		(const struct gb_lights_set_brightness_request *)req->payload;
 	int ret;
 
-	ret = gb_errno_to_op_result(
-		led_set_brightness(dev, req_data->light_id, req_data->brightness));
+	ret = gb_errno_to_op_result(led_set_brightness(data->devs[req_data->light_id],
+						       req_data->light_id, req_data->brightness));
 	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
@@ -167,19 +169,19 @@ static void gb_lights_set_brightness(uint16_t cport, struct gb_message *req,
  */
 static void gb_lights_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	const struct device *dev = priv;
+	const struct gb_lights_driver_data *data = priv;
 
 	switch (gb_message_type(msg)) {
 	case GB_LIGHTS_TYPE_PROTOCOL_VERSION:
 		return gb_lights_protocol_version(cport, msg);
 	case GB_LIGHTS_TYPE_GET_LIGHTS:
-		return gb_lights_get_lights(cport, msg, dev);
+		return gb_lights_get_lights(cport, msg, data);
 	case GB_LIGHTS_TYPE_GET_LIGHT_CONFIG:
-		return gb_lights_get_light_config(cport, msg, dev);
+		return gb_lights_get_light_config(cport, msg, data);
 	case GB_LIGHTS_TYPE_GET_CHANNEL_CONFIG:
-		return gb_lights_get_channel_config(cport, msg, dev);
+		return gb_lights_get_channel_config(cport, msg, data);
 	case GB_LIGHTS_TYPE_SET_BRIGHTNESS:
-		return gb_lights_set_brightness(cport, msg, dev);
+		return gb_lights_set_brightness(cport, msg, data);
 	case GB_LIGHTS_TYPE_SET_BLINK:
 	case GB_LIGHTS_TYPE_SET_COLOR:
 	case GB_LIGHTS_TYPE_SET_FADE:

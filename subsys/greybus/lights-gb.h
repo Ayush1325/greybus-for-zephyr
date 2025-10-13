@@ -26,8 +26,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _GREYBUS_LIGHTS_H_
-#define _GREYBUS_LIGHTS_H_
+#ifndef __GREYBUS_LIGHTS_H__
+#define __GREYBUS_LIGHTS_H__
 
 #include <greybus/types.h>
 
@@ -118,10 +118,7 @@ struct gb_lights_get_channel_config_response {
  * Lights Protocol get channel flash config request payload
  */
 struct gb_lights_get_channel_flash_config_request {
-	/** light identification number */
-	__u8 light_id;
-	/** channel identification number */
-	__u8 channel_id;
+	/** light identification number */ __u8 light_id; /** channel identification number */ __u8 channel_id;
 } __packed;
 
 /**
@@ -259,4 +256,4 @@ struct gb_lights_get_flash_fault_response {
 	__le32 fault;
 } __packed;
 
-#endif /* _GREYBUS_LIGHTS_H_ */
+#endif /* __GREYBUS_LIGHTS_H__ */

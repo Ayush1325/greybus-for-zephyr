@@ -47,8 +47,13 @@ struct greybus_manifest_cport {
 			 COND_CODE_1(CONFIG_GREYBUS_I2C,                                           \
 				     (DT_NODE_HAS_PROP(node_id, i2c_controllers)), (0))))
 
+#define _GB_BUNDLE_LIGHTS_CHECK(node_id)                                                           \
+	UTIL_AND(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_lights, okay),           \
+		 CONFIG_GREYBUS_LIGHTS)
+
 #define _GB_BUNDLE_CB(node_id)                                                                     \
-	IF_ENABLED(_GB_BUNDLE_BRIDGED_PHY_CHECK(node_id), (GREYBUS_CLASS_BRIDGED_PHY))
+	COND_CODE_1(_GB_BUNDLE_BRIDGED_PHY_CHECK(node_id), (GREYBUS_CLASS_BRIDGED_PHY),            \
+		    (IF_ENABLED(_GB_BUNDLE_LIGHTS_CHECK(node_id), (GREYBUS_CLASS_LIGHTS))))
 
 /* Position = Bundle ID. Value = Class */
 static uint8_t bundles[] = {
