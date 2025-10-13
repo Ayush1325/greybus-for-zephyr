@@ -26,65 +26,25 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
-#include <errno.h>
 
 #include <zephyr/device.h>
-#include <zephyr/device_lights.h>
 #include <greybus/greybus.h>
 #include <zephyr/sys/byteorder.h>
 
+#include "greybus_messages.h"
+#include "greybus_transport.h"
 #include "lights-gb.h"
+#include "greybus_lights.h"
 
 #include <zephyr/logging/log.h>
+#include <zephyr/drivers/led.h>
+
 LOG_MODULE_REGISTER(greybus_lights, CONFIG_GREYBUS_LOG_LEVEL);
 
 #define GB_LIGHTS_VERSION_MAJOR 0
 #define GB_LIGHTS_VERSION_MINOR 1
-
-/**
- * The structure for Lights Protocol information
- */
-struct gb_lights_info {
-	unsigned int cport;
-};
-
-/**
- * @brief Event callback function for lights driver
- *
- * Callback for device driver event notification. This function can be called
- * when device driver need to notify the recipient of lights related events
- *
- * @param data pointer to gb_lights_info
- * @param light_id id of light
- * @param event event type
- * @return 0 on success, negative errno on error
- */
-static int event_callback(void *data, uint8_t light_id, uint8_t event)
-{
-	struct gb_operation *operation;
-	struct gb_lights_event_request *request;
-	struct gb_lights_info *lights_info;
-
-	DEBUGASSERT(data);
-	lights_info = data;
-
-	operation = gb_operation_create(lights_info->cport, GB_LIGHTS_TYPE_EVENT, sizeof(*request));
-	if (!operation) {
-		return -EIO;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-	request->light_id = light_id;
-	request->event = event;
-
-	gb_operation_send_request_nowait(operation, false);
-	gb_operation_destroy(operation);
-
-	return 0;
-}
 
 /**
  * @brief Returns the major and minor Greybus Lights Protocol version number
@@ -95,19 +55,14 @@ static int event_callback(void *data, uint8_t light_id, uint8_t event)
  * @param operation pointer to structure of Greybus operation message
  * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_lights_protocol_version(struct gb_operation *operation)
+static void gb_lights_protocol_version(uint16_t cport, struct gb_message *req)
 {
-	struct gb_lights_version_response *response;
+	const struct gb_lights_version_response resp_data = {
+		.major = GB_LIGHTS_VERSION_MAJOR,
+		.minor = GB_LIGHTS_VERSION_MINOR,
+	};
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->major = GB_LIGHTS_VERSION_MAJOR;
-	response->minor = GB_LIGHTS_VERSION_MINOR;
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 /**
@@ -119,27 +74,15 @@ static uint8_t gb_lights_protocol_version(struct gb_operation *operation)
  * @param operation pointer to structure of Greybus operation message
  * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_lights_get_lights(struct gb_operation *operation)
+static void gb_lights_get_lights(uint16_t cport, struct gb_message *req,
+				 const struct gb_lights_driver_data *data)
 {
-	struct gb_lights_get_lights_response *response;
-	struct gb_bundle *bundle;
-	int ret;
+	/* TODO: Add API in zephyr to get led count */
+	const struct gb_lights_get_lights_response resp_data = {
+		.lights_count = data->lights_num,
+	};
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	/* get hardware lights count */
-	ret = device_lights_get_lights(bundle->dev, &response->lights_count);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 /**
@@ -152,39 +95,29 @@ static uint8_t gb_lights_get_lights(struct gb_operation *operation)
  * @param operation pointer to structure of Greybus operation message
  * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_lights_get_light_config(struct gb_operation *operation)
+static void gb_lights_get_light_config(uint16_t cport, struct gb_message *req,
+				       const struct gb_lights_driver_data *data)
 {
-	struct gb_lights_get_light_config_request *request;
-	struct gb_lights_get_light_config_response *response;
-	struct gb_bundle *bundle;
-	struct light_config cfg;
+	const struct gb_lights_get_light_config_request *req_data =
+		(const struct gb_lights_get_light_config_request *)req->payload;
+	struct gb_lights_get_light_config_response resp_data = {
+		.channel_count = 1,
+	};
+	const struct device *const dev = data->devs[req_data->id];
+	const struct led_info *info;
 	int ret;
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
+	/* This function does not seem to be required impl. So in case of failure, just assume that
+	 * channel count is 1 */
+	ret = led_get_info(dev, req_data->id, &info);
+	/* Device name always needs to be set */
+	if (ret >= 0) {
+		strncpy(resp_data.name, info->label, sizeof(resp_data.name));
+	} else {
+		strncpy(resp_data.name, dev->name, sizeof(resp_data.name));
 	}
 
-	request = gb_operation_get_request_payload(operation);
-
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	/* get hardware light config */
-	ret = device_lights_get_light_config(bundle->dev, request->id, &cfg);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	response->channel_count = cfg.channel_count;
-	memcpy(response->name, cfg.name, sizeof(cfg.name));
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 /**
@@ -198,95 +131,18 @@ static uint8_t gb_lights_get_light_config(struct gb_operation *operation)
  * @param operation pointer to structure of Greybus operation message
  * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_lights_get_channel_config(struct gb_operation *operation)
+static void gb_lights_get_channel_config(uint16_t cport, struct gb_message *req,
+					 const struct gb_lights_driver_data *data)
 {
-	struct gb_lights_get_channel_config_request *request;
-	struct gb_lights_get_channel_config_response *response;
-	struct gb_bundle *bundle;
-	struct channel_config cfg;
-	int ret;
+	/* TODO: Implement properly */
+	const struct gb_lights_get_channel_config_response resp_data = {
+		.max_brightness = LED_BRIGHTNESS_MAX,
+		.flags = 0,
+		.mode = 0,
+		.color = 0,
+	};
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	/* get hardware channel config */
-	ret = device_lights_get_channel_config(bundle->dev, request->light_id, request->channel_id,
-					       &cfg);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	response->max_brightness = cfg.max_brightness;
-	response->flags = sys_cpu_to_le32(cfg.flags);
-	response->color = sys_cpu_to_le32(cfg.color);
-	memcpy(response->color_name, cfg.color_name, sizeof(cfg.color_name));
-	response->mode = sys_cpu_to_le32(cfg.mode);
-	memcpy(response->mode_name, cfg.mode_name, sizeof(cfg.mode_name));
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Returns channel flash configuration of specific channel
- *
- * This operation allows the AP Module to get the channel flash configuration
- * of specific flash channel ID. The caller will get the configuration of this
- * flash channel from the lights device driver, includes min/max/step of flash
- * intensity and flash timeout
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_get_channel_flash_config(struct gb_operation *operation)
-{
-	struct gb_lights_get_channel_flash_config_request *request;
-	struct gb_lights_get_channel_flash_config_response *response;
-	struct gb_bundle *bundle;
-	struct channel_flash_config fcfg;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	/* get hardware channel flash config */
-	ret = device_lights_get_channel_flash_config(bundle->dev, request->light_id,
-						     request->channel_id, &fcfg);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	response->intensity_min_uA = sys_cpu_to_le32(fcfg.intensity_min_uA);
-	response->intensity_max_uA = sys_cpu_to_le32(fcfg.intensity_max_uA);
-	response->intensity_step_uA = sys_cpu_to_le32(fcfg.intensity_step_uA);
-	response->timeout_min_us = sys_cpu_to_le32(fcfg.timeout_min_us);
-	response->timeout_max_us = sys_cpu_to_le32(fcfg.timeout_max_us);
-	response->timeout_step_us = sys_cpu_to_le32(fcfg.timeout_step_us);
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 /**
@@ -299,407 +155,51 @@ static uint8_t gb_lights_get_channel_flash_config(struct gb_operation *operation
  * @param operation pointer to structure of Greybus operation message
  * @return GB_OP_SUCCESS on success, error code on failure
  */
-static uint8_t gb_lights_set_brightness(struct gb_operation *operation)
+static void gb_lights_set_brightness(uint16_t cport, struct gb_message *req,
+				     const struct gb_lights_driver_data *data)
 {
-	struct gb_lights_set_brightness_request *request;
-	struct gb_bundle *bundle;
+	const struct gb_lights_set_brightness_request *req_data =
+		(const struct gb_lights_set_brightness_request *)req->payload;
 	int ret;
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	/* set brightness to channel */
-	ret = device_lights_set_brightness(bundle->dev, request->light_id, request->channel_id,
-					   request->brightness);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Set blink to specific channel
- *
- * This operation allows the AP Module to request the lights device driver to
- * enable/disable the blink mode, with the specified values in milliseconds
- * for the on and off periods, which is for the specific channel ID
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_set_blink(struct gb_operation *operation)
-{
-	struct gb_lights_set_blink_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	/* set blink to channel */
-	ret = device_lights_set_blink(bundle->dev, request->light_id, request->channel_id,
-				      sys_le16_to_cpu(request->time_on_ms),
-				      sys_le16_to_cpu(request->time_off_ms));
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Set color to specific channel
- *
- * This operation allows the AP Module to set the color with the specified
- * value in the lights device driver, which is for the specific channel ID
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_set_color(struct gb_operation *operation)
-{
-	struct gb_lights_set_color_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	/* set color to channel */
-	ret = device_lights_set_color(bundle->dev, request->light_id, request->channel_id,
-				      sys_le32_to_cpu(request->color));
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Set fade to specific channel
- *
- * This operation allows the AP Module to set the fade configuration with the
- * specified value in the lights device driver, which is for the specific
- * channel ID
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_set_fade(struct gb_operation *operation)
-{
-	struct gb_lights_set_fade_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	/* set fade to channel */
-	ret = device_lights_set_fade(bundle->dev, request->light_id, request->channel_id,
-				     request->fade_in, request->fade_out);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Set flash intensity to specific channel
- *
- * This operation allows the AP Module to set the flash intensity with the
- * specified value in the lights device driver, which is for the specific flash
- * channel ID
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_set_flash_intensity(struct gb_operation *operation)
-{
-	struct gb_lights_set_flash_intensity_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	/* set flash intensity to channel */
-	ret = device_lights_set_flash_intensity(bundle->dev, request->light_id, request->channel_id,
-						sys_le32_to_cpu(request->intensity_uA));
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Set flash strobe to specific channel
- *
- * This operation allows the AP Module to set the flash strobe on/off
- * in the lights device driver, which is for the specific flash channel ID
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_set_flash_strobe(struct gb_operation *operation)
-{
-	struct gb_lights_set_flash_strobe_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	/* set flash strobe to channel */
-	ret = device_lights_set_flash_strobe(bundle->dev, request->light_id, request->channel_id,
-					     request->state);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Set flash timeout to specific channel
- *
- * This operation allows the AP Module to set the flash timeout with the
- * specified values in milliseconds in the lights device driver, which is for
- * the specific flash channel ID
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_set_flash_timeout(struct gb_operation *operation)
-{
-	struct gb_lights_set_flash_timeout_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	/* set flash timeout to channel */
-	ret = device_lights_set_flash_timeout(bundle->dev, request->light_id, request->channel_id,
-					      sys_le32_to_cpu(request->timeout_us));
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Returns flash fault of specific channel
- *
- * This operation allows the AP Module to get the flash fault of specific
- * flash channel ID from lights device driver
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static uint8_t gb_lights_get_flash_fault(struct gb_operation *operation)
-{
-	struct gb_lights_get_flash_fault_request *request;
-	struct gb_lights_get_flash_fault_response *response;
-	struct gb_bundle *bundle;
-	int ret;
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	/* get hardware flash fault */
-	ret = device_lights_get_flash_fault(bundle->dev, request->light_id, request->channel_id,
-					    &response->fault);
-	if (ret) {
-		return gb_errno_to_op_result(ret);
-	}
-
-	response->fault = sys_cpu_to_le32(response->fault);
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Greybus Lights Protocol initialize function
- *
- * @param cport CPort number
- * @param bundle Greybus bundle handle
- * @return 0 on success, negative errno on error
- */
-static int gb_lights_init(unsigned int cport, struct gb_bundle *bundle)
-{
-	struct gb_lights_info *lights_info;
-	int ret;
-
-	DEBUGASSERT(bundle);
-
-	lights_info = zalloc(sizeof(*lights_info));
-	if (!lights_info) {
-		return -ENOMEM;
-	}
-
-	lights_info->cport = cport;
-
-	bundle->dev = device_open(DEVICE_TYPE_LIGHTS_HW, 0);
-	if (!bundle->dev) {
-		ret = -EIO;
-		goto err_free_info;
-	}
-
-	ret = device_lights_register_callback(bundle->dev, event_callback, lights_info);
-	if (ret) {
-		goto err_close_device;
-	}
-
-	bundle->priv = lights_info;
-
-	return 0;
-
-err_close_device:
-	device_close(bundle->dev);
-
-err_free_info:
-	free(lights_info);
-
-	return ret;
-}
-
-/**
- * @brief Greybus Lights Protocol deinitialize function
- *
- * @param cport CPort number
- * @param bundle Greybus bundle handle
- */
-static void gb_lights_exit(unsigned int cport, struct gb_bundle *bundle)
-{
-	struct gb_lights_info *lights_info;
-
-	DEBUGASSERT(bundle);
-	lights_info = bundle->priv;
-
-	device_lights_unregister_callback(bundle->dev);
-
-	device_close(bundle->dev);
-
-	free(lights_info);
-	lights_info = NULL;
+	ret = gb_errno_to_op_result(led_set_brightness(data->devs[req_data->light_id],
+						       req_data->light_id, req_data->brightness));
+	gb_transport_message_empty_response_send(req, ret, cport);
 }
 
 /**
  * @brief Greybus Lights Protocol operation handler
  */
-static uint8_t gb_lights_handler(uint8_t type, struct gb_operation *opr)
+static void gb_lights_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	switch (type) {
+	const struct gb_lights_driver_data *data = priv;
+
+	switch (gb_message_type(msg)) {
 	case GB_LIGHTS_TYPE_PROTOCOL_VERSION:
-		return gb_lights_protocol_version(opr);
+		return gb_lights_protocol_version(cport, msg);
 	case GB_LIGHTS_TYPE_GET_LIGHTS:
-		return gb_lights_get_lights(opr);
+		return gb_lights_get_lights(cport, msg, data);
 	case GB_LIGHTS_TYPE_GET_LIGHT_CONFIG:
-		return gb_lights_get_light_config(opr);
+		return gb_lights_get_light_config(cport, msg, data);
 	case GB_LIGHTS_TYPE_GET_CHANNEL_CONFIG:
-		return gb_lights_get_channel_config(opr);
-	case GB_LIGHTS_TYPE_GET_CHANNEL_FLASH_CONFIG:
-		return gb_lights_get_channel_flash_config(opr);
+		return gb_lights_get_channel_config(cport, msg, data);
 	case GB_LIGHTS_TYPE_SET_BRIGHTNESS:
-		return gb_lights_set_brightness(opr);
+		return gb_lights_set_brightness(cport, msg, data);
 	case GB_LIGHTS_TYPE_SET_BLINK:
-		return gb_lights_set_blink(opr);
 	case GB_LIGHTS_TYPE_SET_COLOR:
-		return gb_lights_set_color(opr);
 	case GB_LIGHTS_TYPE_SET_FADE:
-		return gb_lights_set_fade(opr);
+	case GB_LIGHTS_TYPE_GET_CHANNEL_FLASH_CONFIG:
 	case GB_LIGHTS_TYPE_SET_FLASH_INTENSITY:
-		return gb_lights_set_flash_intensity(opr);
 	case GB_LIGHTS_TYPE_SET_FLASH_STROBE:
-		return gb_lights_set_flash_strobe(opr);
 	case GB_LIGHTS_TYPE_SET_FLASH_TIMEOUT:
-		return gb_lights_set_flash_timeout(opr);
 	case GB_LIGHTS_TYPE_GET_FLASH_FAULT:
-		return gb_lights_get_flash_fault(opr);
+		return gb_transport_message_empty_response_send(msg, GB_OP_INTERNAL, cport);
 	default:
 		LOG_ERR("Invalid type");
-		return GB_OP_INVALID;
+		return gb_transport_message_empty_response_send(msg, GB_OP_PROTOCOL_BAD, cport);
 	}
 }
 
-static struct gb_driver gb_lights_driver = {
-	.init = gb_lights_init,
-	.exit = gb_lights_exit,
+struct gb_driver gb_lights_driver = {
 	.op_handler = gb_lights_handler,
 };
-
-/**
- * @brief Register Greybus Lights Protocol
- *
- * @param cport CPort number
- * @param bundle Bundle number.
- */
-void gb_lights_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &gb_lights_driver);
-}

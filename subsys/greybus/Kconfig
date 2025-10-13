@@ -187,6 +187,7 @@ config GREYBUS_I2C
 
 config GREYBUS_LIGHTS
 	bool "Greybus Lights"
+	depends on LED
 	help
 	  Select this for Greybus Light support.
 
