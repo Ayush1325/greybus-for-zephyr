@@ -1,0 +1,13 @@
+# Copyright (c) 2025 Ayush Singh, BeagleBoard.org
+#
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "Greybus basic sample"
+
+config PRINT_MANIFEST
+	bool "Print greybus manifest at startup"
+	depends on GREYBUS
+	help
+	  Print greybus manifest at application startup
+
+source "Kconfig.zephyr"
