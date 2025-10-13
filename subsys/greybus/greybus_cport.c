@@ -49,9 +49,10 @@ enum {
 	IF_ENABLED(CONFIG_GREYBUS_LIGHTS, (GB_LIGHTS_PRIV_DATA(_node_id)))
 
 #define GB_PRIV_DATA_HANDLER(_node_id)                                                             \
-	COND_CODE_1(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle_bridged_phy),               \
+	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_bridged_phy, okay),  \
 		    (GB_GPIO_PRIV_DATA_HANDLER(_node_id)),                                         \
-		    (IF_ENABLED(DT_NODE_HAS_COMPAT(_node_id, zephyr_greybus_bundle_lights),        \
+		    (IF_ENABLED(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_lights,  \
+							  okay),                                   \
 				(GB_LIGHTS_PRIV_DATA_HANDLER(_node_id)))))
 
 /* Define GPIO private data */
@@ -91,9 +92,10 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 						    GREYBUS_PROTOCOL_LIGHTS, &gb_lights_driver)))
 
 #define GB_CPORTS_IN_BUNDLE(node_id, bundle)                                                       \
-	COND_CODE_1(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle_bridged_phy),                \
+	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_bridged_phy, okay),   \
 		    (GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id, bundle)),                       \
-		    (IF_ENABLED(DT_NODE_HAS_COMPAT(node_id, zephyr_greybus_bundle_lights),         \
+		    (IF_ENABLED(DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_lights,   \
+							  okay),                                   \
 				(GREYBUS_CPORT_IN_LIGHTS(node_id, bundle)))))
 
 /* Requred for counter based naming to work */

@@ -100,19 +100,22 @@ static void gb_lights_get_light_config(uint16_t cport, struct gb_message *req,
 {
 	const struct gb_lights_get_light_config_request *req_data =
 		(const struct gb_lights_get_light_config_request *)req->payload;
+	struct gb_lights_get_light_config_response resp_data = {
+		.channel_count = 1,
+	};
+	const struct device *const dev = data->devs[req_data->id];
 	const struct led_info *info;
-	struct gb_lights_get_light_config_response resp_data;
 	int ret;
 
-	ret = led_get_info(data->devs[req_data->id], req_data->id, &info);
-	if (ret < 0) {
-		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	/* This function does not seem to be required impl. So in case of failure, just assume that
+	 * channel count is 1 */
+	ret = led_get_info(dev, req_data->id, &info);
+	/* Device name always needs to be set */
+	if (ret >= 0) {
+		strncpy(resp_data.name, info->label, sizeof(resp_data.name));
+	} else {
+		strncpy(resp_data.name, dev->name, sizeof(resp_data.name));
 	}
-
-	strncpy(resp_data.name, info->label, sizeof(resp_data.name));
-	/* TODO: Currently there does not seem to be any API to get channels for an led (even though
-	 * you can write to a led channel) */
-	resp_data.channel_count = 1;
 
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
@@ -132,7 +135,7 @@ static void gb_lights_get_channel_config(uint16_t cport, struct gb_message *req,
 					 const struct gb_lights_driver_data *data)
 {
 	/* TODO: Implement properly */
-	struct gb_lights_get_channel_config_response resp_data = {
+	const struct gb_lights_get_channel_config_response resp_data = {
 		.max_brightness = LED_BRIGHTNESS_MAX,
 		.flags = 0,
 		.mode = 0,
