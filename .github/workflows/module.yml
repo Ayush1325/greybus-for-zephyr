@@ -8,6 +8,7 @@ on:
 
 jobs:
   build:
+    name: Twister samples
     runs-on: ubuntu-latest
     
     steps:
@@ -22,17 +23,12 @@ jobs:
         app-path: greybus
         toolchains: arm-zephyr-eabi
 
-    - name: Build for beagleconnect_freedom
+    - name: Build
       run: |
         mkdir dist
-
-        west build -b beagleconnect_freedom -p always greybus/samples/subsys/greybus/net -- -DEXTRA_CONF_FILE=overlay-802154-subg.conf
-        mv build/zephyr/zephyr.bin dist/beagleconnect_freedom_net.bin
-        xz -z dist/beagleconnect_freedom_net.bin
-
-        west build -b beagleconnect_freedom -p always greybus/samples/subsys/greybus/print_manifest
-        mv build/zephyr/zephyr.bin dist/beagleconnect_freedom_print_manifest.bin
-        xz -z dist/beagleconnect_freedom_print_manifest.bin
+        west twister -T greybus/samples
+        mv twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/samples/basic/sample.greybus.basic.transport.tcpip/zephyr/zephyr.bin dist/beagleconnect_freedom_subg.bin
+        xz -z dist/beagleconnect_freedom_subg.bin
     
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

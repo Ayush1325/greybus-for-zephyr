@@ -326,15 +326,16 @@ static void gpio_callback_handler(const struct device *port, struct gpio_callbac
 	int ret;
 	size_t i;
 	struct gb_gpio_driver_data *data = CONTAINER_OF(cb, struct gb_gpio_driver_data, cb);
-	struct gpio_irq_event_request_msg msg = {0};
+	uint8_t buf[sizeof(struct gpio_irq_event_request_msg)] = {0};
+	struct gpio_irq_event_request_msg *msg = (struct gpio_irq_event_request_msg *)buf;
 
-	msg.hdr.size = sys_cpu_to_le16(sizeof(msg));
-	msg.hdr.type = GB_GPIO_TYPE_IRQ_EVENT;
+	msg->hdr.size = sys_cpu_to_le16(sizeof(buf));
+	msg->hdr.type = GB_GPIO_TYPE_IRQ_EVENT;
 
 	for (i = 0; i < GPIO_MAX_PINS_PER_PORT && pins != 0; ++i, pins >>= 1) {
 		if (pins & 1) {
-			msg.body.which = i;
-			ret = gb_transport_message_send((const struct gb_message *)&msg,
+			msg->body.which = i;
+			ret = gb_transport_message_send((const struct gb_message *)buf,
 							data->cport);
 			if (ret < 0) {
 				LOG_ERR("GPIO irq send failed: %d", ret);
