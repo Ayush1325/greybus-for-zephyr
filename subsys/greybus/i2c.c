@@ -1,6 +1,8 @@
 /*
  * Copyright (c) 2014-2015 Google Inc.
  * Copyright (c) 2020 Friedt Professional Engineering Services, Inc
+ * Copyright (c) 2025 Ayush Singh, BeagleBoard.org
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
