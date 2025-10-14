@@ -26,8 +26,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _GREYBUS_PWM_H_
-#define _GREYBUS_PWM_H_
+#ifndef __GREYBUS_PWM_H__
+#define __GREYBUS_PWM_H__
 
 #include <greybus/types.h>
 
