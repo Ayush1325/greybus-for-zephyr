@@ -19,3 +19,7 @@ properties:
   pwm-controllers:
     type: phandles
     description: PWM controllers in the bundle
+
+  spi-controllers:
+    type: phandles
+    description: SPI controllers in the bundle

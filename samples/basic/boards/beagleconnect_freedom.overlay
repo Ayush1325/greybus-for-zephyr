@@ -12,6 +12,7 @@
 			gpio-controllers = <&gpio0>;
 			i2c-controllers = <&sens_i2c>;
 			pwm-controllers = <&pwm0 &pwm1>;
+			spi-controllers = <&spi0>;
 		};
 
 		gbbundle2 {

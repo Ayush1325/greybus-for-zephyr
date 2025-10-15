@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2015 Google, Inc.
+ * Copyright (c) 2025 Ayush Singh, BeagleBoard.org
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +28,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "greybus_heap.h"
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <zephyr/device.h>
@@ -38,16 +39,8 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-
-#if defined(CONFIG_BOARD_NATIVE_POSIX_64BIT) || defined(CONFIG_BOARD_NATIVE_POSIX_32BIT) ||        \
-	defined(CONFIG_BOARD_NRF52_BSIM)
-#include <unistd.h>
-extern int usleep(useconds_t usec);
-#else
-#include <zephyr/posix/unistd.h>
-#endif
-
 #include "spi-gb.h"
+#include "greybus_spi.h"
 
 LOG_MODULE_REGISTER(greybus_spi, CONFIG_GREYBUS_LOG_LEVEL);
 
@@ -71,65 +64,24 @@ static void gb_spi_protocol_version(uint16_t cport, struct gb_message *req)
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-static int device_spi_get_master_config(const struct device *dev,
-					struct gb_spi_master_config_response *response)
-{
-	int ret;
-
-	const struct device *gb_spidev = gb_spidev_from_zephyr_spidev(dev);
-	if (gb_spidev == NULL) {
-		return -ENODEV;
-	}
-
-	const struct gb_platform_spi_api *api = gb_spidev->api;
-	__ASSERT_NO_MSG(api != NULL);
-
-	ret = api->controller_config_response(gb_spidev, response);
-	__ASSERT_NO_MSG(ret == 0);
-
-	return 0;
-}
-
 /**
  * @brief Returns a set of configuration parameters related to SPI master.
  */
 static void gb_spi_protocol_master_config(uint16_t cport, struct gb_message *req,
-					  const struct device *dev)
+					  const struct gb_spi_driver_data *data)
 {
-	struct gb_spi_master_config_response resp_data;
-	int ret = 0;
+	ARG_UNUSED(data);
 
-	ret = device_spi_get_master_config(dev, &resp_data);
-	if (ret) {
-		ret = gb_errno_to_op_result(ret);
-		gb_transport_message_empty_response_send(req, ret, cport);
-	}
-
-	/* TODO: use compile-time byte swap operators in platform/spi.c
-	 * so byteswapping is eliminated here */
-	resp_data.bpw_mask = sys_cpu_to_le32(resp_data.bpw_mask);
-	resp_data.min_speed_hz = sys_cpu_to_le32(resp_data.min_speed_hz);
-	resp_data.max_speed_hz = sys_cpu_to_le32(resp_data.max_speed_hz);
-	resp_data.mode = sys_cpu_to_le16(resp_data.mode);
-	resp_data.flags = sys_cpu_to_le16(resp_data.flags);
-	resp_data.num_chipselect = sys_cpu_to_le16(resp_data.num_chipselect);
+	/* TODO: Zephyr should provide API to get these details */
+	const struct gb_spi_master_config_response resp_data = {
+		.min_speed_hz = 738,
+		.max_speed_hz = 24000000,
+		.mode = 0,
+		.flags = 0,
+		.num_chipselect = 1,
+	};
 
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
-
-static int device_spi_get_device_config(const struct device *dev, uint8_t cs,
-					struct gb_spi_device_config_response *response)
-{
-	int ret;
-
-	const struct device *gb_spidev = gb_spidev_from_zephyr_spidev(dev);
-	const struct gb_platform_spi_api *api = (struct gb_platform_spi_api *)gb_spidev->api;
-	__ASSERT_NO_MSG(api != NULL);
-
-	ret = api->peripheral_config_response(gb_spidev, cs, response);
-	__ASSERT_NO_MSG(ret == 0);
-
-	return 0;
 }
 
 /**
@@ -139,107 +91,32 @@ static int device_spi_get_device_config(const struct device *dev, uint8_t cs,
  * selected.
  */
 static void gb_spi_protocol_device_config(uint16_t cport, struct gb_message *req,
-					  const struct device *dev)
+					  const struct gb_spi_driver_data *data)
 {
-	const struct gb_spi_device_config_request *request =
+	const struct gb_spi_device_config_request *req_data =
 		(const struct gb_spi_device_config_request *)req->payload;
-	struct gb_spi_device_config_response resp_data;
-	uint8_t cs;
-	int ret = 0;
+	struct gb_spi_device_config_response dev_data;
+	size_t i;
 
-	if (gb_message_payload_len(req) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	strncpy(dev_data.name, data->dev->name, sizeof(dev_data.name));
+
+	for (i = 0; i < data->device_num; i++) {
+		if (data->device_num == req_data->chip_select) {
+			return gb_transport_message_response_success_send(
+				req, &data->devices[req_data->chip_select].data, sizeof(dev_data),
+				cport);
+		}
 	}
 
-	cs = request->chip_select;
+	/* Use normal spi dev device
+	 * TODO: Need to be the same as master config
+	 */
+	dev_data.max_speed_hz = 24000000;
+	dev_data.mode = 0;
+	dev_data.bpw = 0;
+	dev_data.device_type = GB_SPI_SPI_DEV;
 
-	/* get selected chip of configuration */
-	ret = device_spi_get_device_config(dev, cs, &resp_data);
-	if (ret) {
-		ret = gb_errno_to_op_result(ret);
-		gb_transport_message_empty_response_send(req, ret, cport);
-	}
-
-	/* TODO: use compile-time byte swap operators in platform/spi.c
-	 * so byteswapping is eliminated here */
-	resp_data.mode = sys_cpu_to_le16(resp_data.mode);
-	resp_data.max_speed_hz = sys_cpu_to_le32(resp_data.max_speed_hz);
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
-
-static int request_to_spi_config(const struct gb_spi_transfer_request *const request,
-				 const size_t freq, const uint8_t bits_per_word,
-				 const struct device *spi_dev, struct spi_config *const spi_config,
-				 struct spi_cs_control *ctrl)
-{
-	const struct device *gb_spidev = gb_spidev_from_zephyr_spidev(spi_dev);
-
-	if (gb_spidev == NULL) {
-		return -ENODEV;
-	}
-
-	const struct gb_platform_spi_api *api = gb_spidev->api;
-	__ASSERT_NO_MSG(api != NULL);
-
-	spi_config->frequency = freq;
-	spi_config->slave = request->chip_select;
-	spi_config->operation = SPI_OP_MODE_MASTER | SPI_WORD_SET(bits_per_word);
-
-	if (request->mode & GB_SPI_MODE_CPHA) {
-		spi_config->operation |= SPI_MODE_CPHA;
-	}
-
-	if (request->mode & GB_SPI_MODE_CPOL) {
-		spi_config->operation |= SPI_MODE_CPOL;
-	}
-
-	if (request->mode & GB_SPI_MODE_CS_HIGH) {
-		spi_config->operation |= SPI_CS_ACTIVE_HIGH;
-	}
-
-	if (request->mode & GB_SPI_MODE_CS_HIGH) {
-		spi_config->operation |= SPI_CS_ACTIVE_HIGH;
-	}
-
-	if (request->mode & GB_SPI_MODE_LSB_FIRST) {
-		spi_config->operation |= SPI_TRANSFER_LSB;
-	}
-
-	if (request->mode & GB_SPI_MODE_3WIRE) {
-		/* Do nothing. I think this is the presumptive case */
-	}
-
-	if (request->mode & GB_SPI_MODE_LOOP) {
-		spi_config->operation |= SPI_MODE_LOOP;
-	}
-
-	if (request->mode & GB_SPI_MODE_NO_CS) {
-		// if (spi_config->cs != NULL) {
-		/* LOG_DBG("GB_SPI_MODE_NO_CS flag given but spi_config->cs is "
-			"non-NULL (%p)", spi_config->cs); */
-		// }
-	}
-
-	if (request->mode & GB_SPI_MODE_READY) {
-		/* LOG_DBG("GB_SPI_MODE_READY not handled"); */
-	}
-
-	if (false || ((request->mode & GB_SPI_FLAG_HALF_DUPLEX) != 0) ||
-	    ((request->mode & GB_SPI_FLAG_NO_RX) != 0) ||
-	    ((request->mode & GB_SPI_FLAG_NO_TX) != 0)) {
-		/* LOG_DBG("GB_SPI_FLAG_{HALF_DUPLEX,NO_{RX,TX}} not handled"); */
-	}
-
-	if (!api->get_cs_control(gb_spidev, request->chip_select, ctrl)) {
-		// spi_config->cs = ctrl;
-		memcpy(&spi_config->cs, ctrl, sizeof(struct spi_cs_control));
-	} else {
-		// spi_config->cs = NULL;
-	}
-
-	return 0;
+	gb_transport_message_response_success_send(req, &dev_data, sizeof(dev_data), cport);
 }
 
 /**
@@ -247,187 +124,140 @@ static int request_to_spi_config(const struct gb_spi_transfer_request *const req
  *        in the supplied array.
  */
 static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
-				     const struct device *dev)
+				     const struct gb_spi_driver_data *data)
 {
+	int ret;
+	struct gb_spi_transfer_request *req_data = (struct gb_spi_transfer_request *)req->payload;
+	struct gb_spi_transfer_desc *desc;
+	struct spi_config conf = {0};
+	size_t i, resp_pos = 0, resp_size = 0;
 	struct gb_message *resp;
-	const struct gb_spi_transfer_desc *desc;
-	struct gb_spi_transfer_response *resp_data;
-	struct spi_config spi_config;
-	struct spi_cs_control spi_cs_control;
+	struct spi_buf tx_buf, rx_buf;
+	uint8_t *trans_data = req->payload + 4 + (13 * req_data->count);
+	const struct spi_buf_set tx_buf_set = {
+		.buffers = &tx_buf,
+		.count = 1,
+	};
+	const struct spi_buf_set rx_buf_set = {
+		.buffers = &rx_buf,
+		.count = 1,
+	};
 
-	struct spi_buf_set _tx_buf_set;
-	struct spi_buf_set *tx_buf_set = &_tx_buf_set;
-	struct spi_buf *tx_buf = NULL;
-
-	struct spi_buf_set _rx_buf_set;
-	struct spi_buf_set *rx_buf_set = &_rx_buf_set;
-	struct spi_buf *rx_buf = NULL;
-
-	uint32_t read_data_size = 0;
-	uint8_t *write_data, *read_data;
-	int i, op_count;
-	uint8_t bits_per_word;
-	int ret = 0, errcode = GB_OP_SUCCESS;
-	size_t expected_size;
-	const struct gb_spi_transfer_request *request =
-		(const struct gb_spi_transfer_request *)req->payload;
-
-	if (gb_message_payload_len(req) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+	if (req_data->mode & (GB_SPI_MODE_NO_CS | GB_SPI_MODE_3WIRE | GB_SPI_MODE_READY)) {
+		LOG_ERR("SPI Mode %u is not supported", req_data->mode);
+		gb_transport_message_empty_response_send(req, GB_OP_INTERNAL, cport);
+		goto free_req;
 	}
 
-	op_count = sys_le16_to_cpu(request->count);
-	if (op_count == 0) {
-		return gb_transport_message_empty_response_send(req, GB_OP_SUCCESS, cport);
+	conf.slave = req_data->chip_select;
+	if (req_data->mode & GB_SPI_MODE_CPHA) {
+		conf.operation |= SPI_MODE_CPHA;
+	}
+	if (req_data->mode & GB_SPI_MODE_CPOL) {
+		conf.operation |= SPI_MODE_CPOL;
+	}
+	if (req_data->mode & GB_SPI_MODE_CS_HIGH) {
+		conf.operation |= SPI_CS_ACTIVE_HIGH;
+	}
+	if (req_data->mode & GB_SPI_MODE_LSB_FIRST) {
+		conf.operation |= SPI_TRANSFER_LSB;
+	}
+	if (req_data->mode & GB_SPI_MODE_LOOP) {
+		conf.operation |= SPI_MODE_LOOP;
 	}
 
-	write_data = (uint8_t *)&request->transfers[op_count];
-	bits_per_word = request->transfers[0].bits_per_word;
-
-	for (i = 0, read_data_size = 0; i < op_count; ++i) {
-		desc = &request->transfers[i];
+	/* Calculate the response size */
+	for (i = 0; i < req_data->count; ++i) {
+		desc = &req_data->transfers[i];
 		if (desc->rdwr & GB_SPI_XFER_READ) {
-			if (sys_le32_to_cpu(desc->len) == 0) {
-				LOG_ERR("read operation of length 0 is invalid");
-				return gb_transport_message_empty_response_send(req, GB_OP_INVALID,
-										cport);
-			}
-			read_data_size += sys_le32_to_cpu(desc->len);
+			resp_size += desc->len;
 		}
+	}
 
-		/* ensure 1 bpw setting */
-		if (desc->bits_per_word != bits_per_word) {
-			LOG_ERR("only 1 bpw setting supported");
-			return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
-		}
+	resp = gb_message_alloc(resp_size, GB_RESPONSE(GB_SPI_PROTOCOL_TRANSFER), req->header.id,
+				GB_OP_SUCCESS);
+	for (i = 0; i < req_data->count; ++i) {
+		desc = &req_data->transfers[i];
+		conf.frequency = desc->speed_hz;
+		conf.operation |= SPI_WORD_SET(desc->bits_per_word);
 
-		/* ensure no cs_change */
 		if (desc->cs_change) {
 			LOG_ERR("cs_change not supported");
-			return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+			gb_transport_message_empty_response_send(req, GB_OP_INTERNAL, cport);
+			goto free_resp;
 		}
-	}
 
-	tx_buf = gb_alloc(op_count * 2 * sizeof(*tx_buf));
-	rx_buf = &tx_buf[op_count];
-	if (tx_buf == NULL) {
-		free(tx_buf);
-		LOG_ERR("Failed to allocate buffer descriptors");
-		errcode = GB_OP_NO_MEMORY;
-		goto out;
-	}
+		if ((desc->rdwr & GB_SPI_XFER_READ) && (desc->rdwr & GB_SPI_XFER_WRITE)) {
+			rx_buf.buf = resp->payload + resp_pos;
+			rx_buf.len = desc->len;
+			tx_buf.buf = trans_data;
+			tx_buf.len = desc->len;
 
-	expected_size = sizeof(*request) + op_count * sizeof(request->transfers[0]);
-	if (gb_message_payload_len(req) < expected_size) {
-		LOG_ERR("dropping short message");
-		errcode = GB_OP_INVALID;
-		goto freebufs;
-	}
+			ret = spi_transceive(data->dev, &conf, &tx_buf_set, &rx_buf_set);
+			if (ret < 0) {
+				LOG_ERR("SPI transceive failed");
+				gb_transport_message_empty_response_send(req, GB_OP_INTERNAL,
+									 cport);
+				goto free_resp;
+			}
 
-	resp = gb_message_alloc(read_data_size, GB_RESPONSE(req->header.type), req->header.id,
-				GB_OP_SUCCESS);
-	if (!resp) {
-		gb_transport_message_empty_response_send(req, GB_OP_NO_MEMORY, cport);
-		goto freebufs;
-	}
-	resp_data = (struct gb_spi_transfer_response *)resp->payload;
+			trans_data += desc->len;
+			resp_pos += desc->len;
+		} else if (desc->rdwr & GB_SPI_XFER_READ) {
+			rx_buf.buf = resp->payload + resp_pos;
+			rx_buf.len = desc->len;
 
-	/* parse all transfer request from AP host side */
-	tx_buf_set->buffers = tx_buf;
-	tx_buf_set->count = 0;
+			ret = spi_read(data->dev, &conf, &rx_buf_set);
+			if (ret < 0) {
+				LOG_ERR("SPI read failed");
+				gb_transport_message_empty_response_send(req, GB_OP_INTERNAL,
+									 cport);
+				goto free_resp;
+			}
 
-	if (read_data_size > 0) {
-		rx_buf_set->buffers = rx_buf;
-		rx_buf_set->count = 0;
-		read_data = resp_data->data;
-	} else {
-		read_data = NULL;
-		rx_buf_set = NULL;
-	}
+			resp_pos += desc->len;
+		} else if (desc->rdwr & GB_SPI_XFER_WRITE) {
+			tx_buf.buf = trans_data;
+			tx_buf.len = desc->len;
+			ret = spi_write(data->dev, &conf, &tx_buf_set);
+			if (ret < 0) {
+				LOG_ERR("SPI write failed");
+				gb_transport_message_empty_response_send(req, GB_OP_INTERNAL,
+									 cport);
+				goto free_resp;
+			}
 
-	for (i = 0; i < op_count; ++i) {
-		desc = &request->transfers[i];
-
-		/* setup SPI transfer */
-		switch (desc->rdwr) {
-		case GB_SPI_XFER_WRITE:
-			tx_buf[i].buf = write_data;
-			tx_buf[i].len = sys_le32_to_cpu(desc->len);
-			write_data += tx_buf[i].len;
-			++tx_buf_set->count;
-			rx_buf[i].buf = NULL;
-			rx_buf[i].len = 0;
-			break;
-		case GB_SPI_XFER_READ:
-			tx_buf[i].buf = NULL;
-			tx_buf[i].len = 0;
-			rx_buf[i].buf = read_data;
-			rx_buf[i].len = sys_le32_to_cpu(desc->len);
-			read_data += rx_buf[i].len;
-			++rx_buf_set->count;
-			break;
-		case GB_SPI_XFER_WRITE | GB_SPI_XFER_READ:
-			tx_buf[i].buf = write_data;
-			tx_buf[i].len = sys_le32_to_cpu(desc->len);
-			write_data += tx_buf[i].len;
-			++tx_buf_set->count;
-			rx_buf[i].buf = read_data;
-			rx_buf[i].len = sys_le32_to_cpu(desc->len);
-			read_data += rx_buf[i].len;
-			++rx_buf_set->count;
-			break;
-		default:
-			LOG_ERR("invalid flags in rdwr %x", desc->rdwr);
-			errcode = GB_OP_INVALID;
-			goto freemsg;
+			trans_data += desc->len;
+		} else {
+			LOG_ERR("Invalid flag");
+			gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
+			goto free_resp;
 		}
-	}
 
-	/* set SPI configuration */
-	ret = request_to_spi_config(request, sys_le32_to_cpu(request->transfers[0].speed_hz),
-				    bits_per_word, dev, &spi_config, &spi_cs_control);
-	if (ret) {
-		errcode = gb_errno_to_op_result(-ret);
-		goto freemsg;
+		k_sleep(K_USEC(desc->delay_usecs));
 	}
-
-	/* start SPI transfer */
-	ret = spi_transceive(dev, &spi_config, tx_buf_set, rx_buf_set);
-	if (ret) {
-		errcode = gb_errno_to_op_result(-ret);
-		goto freemsg;
-	}
-
-	errcode = GB_OP_SUCCESS;
 
 	gb_transport_message_send(resp, cport);
+
+free_resp:
 	gb_message_dealloc(resp);
-	return;
-
-freemsg:
-	gb_message_dealloc(resp);
-
-freebufs:
-	gb_free(tx_buf);
-
-out:
-	gb_transport_message_empty_response_send(req, errcode, cport);
+free_req:
+	gb_message_dealloc(req);
 }
 
 static void gb_spi_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	const struct device *dev = priv;
+	const struct gb_spi_driver_data *data = priv;
 
 	switch (gb_message_type(msg)) {
 	case GB_SPI_PROTOCOL_VERSION:
 		return gb_spi_protocol_version(cport, msg);
 	case GB_SPI_TYPE_MASTER_CONFIG:
-		return gb_spi_protocol_master_config(cport, msg, dev);
+		return gb_spi_protocol_master_config(cport, msg, data);
 	case GB_SPI_TYPE_DEVICE_CONFIG:
-		return gb_spi_protocol_device_config(cport, msg, dev);
+		return gb_spi_protocol_device_config(cport, msg, data);
 	case GB_SPI_PROTOCOL_TRANSFER:
-		return gb_spi_protocol_transfer(cport, msg, dev);
+		return gb_spi_protocol_transfer(cport, msg, data);
 	default:
 		LOG_ERR("Invalid type");
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);

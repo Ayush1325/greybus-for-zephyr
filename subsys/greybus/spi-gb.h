@@ -26,8 +26,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _GREYBUS_SPI_H_
-#define _GREYBUS_SPI_H_
+#ifndef __GREYBUS_SPI_H__
+#define __GREYBUS_SPI_H__
 
 #include <greybus/types.h>
 #include <dt-bindings/greybus/spi.h>
@@ -130,7 +130,7 @@ struct gb_spi_transfer_request {
 	/** Number of gb_spi_transfer_desc */
 	__le16 count;
 	/** SPI gb_spi_transfer_desc array in the transfer */
-	struct gb_spi_transfer_desc transfers[0];
+	struct gb_spi_transfer_desc transfers[];
 } __packed;
 
 /**
@@ -141,4 +141,4 @@ struct gb_spi_transfer_response {
 	__u8 data[0];
 } __packed;
 
-#endif /* _GREYBUS_SPI_H_ */
+#endif /* __GREYBUS_SPI_H__ */

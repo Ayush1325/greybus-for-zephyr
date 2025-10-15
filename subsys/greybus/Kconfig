@@ -214,6 +214,7 @@ config GREYBUS_SDIO
 
 config GREYBUS_SPI
 	bool "Greybus SPI"
+	depends on SPI
 	help
 	  Select this for Greybus Serial Peripheral Interface support.
 
