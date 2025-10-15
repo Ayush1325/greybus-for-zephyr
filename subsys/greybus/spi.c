@@ -28,7 +28,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "greybus_heap.h"
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <zephyr/device.h>
@@ -99,6 +98,8 @@ static void gb_spi_protocol_device_config(uint16_t cport, struct gb_message *req
 	struct gb_spi_device_config_response dev_data;
 	size_t i;
 
+	strncpy(dev_data.name, data->dev->name, sizeof(dev_data.name));
+
 	for (i = 0; i < data->device_num; i++) {
 		if (data->device_num == req_data->chip_select) {
 			return gb_transport_message_response_success_send(
@@ -112,7 +113,6 @@ static void gb_spi_protocol_device_config(uint16_t cport, struct gb_message *req
 	 */
 	dev_data.max_speed_hz = 24000000;
 	dev_data.mode = 0;
-	strncpy(dev_data.name, data->dev->name, sizeof(dev_data.name));
 	dev_data.bpw = 0;
 	dev_data.device_type = GB_SPI_SPI_DEV;
 

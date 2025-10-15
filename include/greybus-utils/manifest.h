@@ -41,6 +41,7 @@
 #define _GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id)                                             \
 	(_BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_GPIO, gpio_controllers) +                        \
 	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_I2C, i2c_controllers) +                          \
+	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_SPI, spi_controllers) +                          \
 	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_PWM, pwm_controllers))
 
 #define _GREYBUS_CPORT_COUNTER(_node_id)                                                           \

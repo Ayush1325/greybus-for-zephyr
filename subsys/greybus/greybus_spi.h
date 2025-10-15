@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include "spi-gb.h"
 
+extern struct gb_driver gb_spi_driver;
+
 struct gb_spi_device_data {
 	struct gb_spi_device_config_response data;
 	uint8_t id;
