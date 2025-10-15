@@ -61,9 +61,9 @@ static void gb_pwm_protocol_version(uint16_t cport, struct gb_message *req)
 static void gb_pwm_protocol_count(uint16_t cport, struct gb_message *req,
 				  struct gb_pwm_driver_data *data)
 {
-	/* TODO: Implement properly */
+	/* The spec states that count should be 1 less than the number of channels. */
 	const struct gb_pwm_count_response resp_data = {
-		.count = data->channel_num,
+		.count = data->channel_num - 1,
 	};
 
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
