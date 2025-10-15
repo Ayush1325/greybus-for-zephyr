@@ -49,4 +49,4 @@ clear_mnfb:
 	return r;
 }
 
-SYS_INIT(greybus_service_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);
+SYS_INIT(greybus_service_init, APPLICATION, CONFIG_GREYBUS_SERVICE_INIT_PRIORITY);
