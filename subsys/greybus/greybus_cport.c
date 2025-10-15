@@ -10,14 +10,13 @@
 #include <zephyr/logging/log.h>
 #include "greybus_gpio.h"
 #include "greybus_lights.h"
+#include "greybus_pwm.h"
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
 extern struct gb_driver gb_control_driver;
-extern struct gb_driver gb_gpio_driver;
 extern struct gb_driver gb_i2c_driver;
 extern struct gb_driver gb_loopback_driver;
-extern struct gb_driver gb_lights_driver;
 
 /* Reset the counter to 0 */
 enum {
@@ -25,14 +24,28 @@ enum {
 };
 #define LOCAL_COUNTER (__COUNTER__ - COUNTER_BASE - 1)
 
+/* Macro to check if a type of cport is present */
+#define GB_BRIDGED_PHY_CHECK(_node_id, _ctrl, _config)                                             \
+	UTIL_AND(DT_NODE_HAS_PROP(_node_id, _ctrl), _config)
+
 #define GB_GPIO_PRIV_DATA(_node_id, _prop, _idx)                                                   \
 	static struct gb_gpio_driver_data gb_gpio_priv_data_##_idx = {                             \
 		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
 	};
 
-#define GB_GPIO_PRIV_DATA_HANDLER(_node_id)                                                        \
-	IF_ENABLED(CONFIG_GREYBUS_GPIO,                                                            \
-		   (DT_FOREACH_PROP_ELEM(_node_id, gpio_controllers, GB_GPIO_PRIV_DATA)))
+#define GB_PWM_PRIV_DATA(_node_id, _prop, _idx)                                                    \
+	static struct gb_pwm_channel_data gb_pwm_channel_data_arr_##_idx[1];                       \
+	static struct gb_pwm_driver_data gb_pwm_priv_data_##_idx = {                               \
+		.channel_data = gb_pwm_channel_data_arr_##_idx,                                    \
+		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
+		.channel_num = ARRAY_SIZE(gb_pwm_channel_data_arr_##_idx),                         \
+	};
+
+#define GB_BRIDGED_PHY_PRIV_DATA_HANDLER(_node_id)                                                 \
+	IF_ENABLED(GB_BRIDGED_PHY_CHECK(_node_id, gpio_controllers, CONFIG_GREYBUS_GPIO),          \
+		   (DT_FOREACH_PROP_ELEM(_node_id, gpio_controllers, GB_GPIO_PRIV_DATA)))          \
+	IF_ENABLED(GB_BRIDGED_PHY_CHECK(_node_id, pwm_controllers, CONFIG_GREYBUS_PWM),            \
+		   (DT_FOREACH_PROP_ELEM(_node_id, pwm_controllers, GB_PWM_PRIV_DATA)))
 
 #define GB_LIGHTS_PRIV_DATA_ITEM(_node_id, _prop, _idx)                                            \
 	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx))
@@ -50,7 +63,7 @@ enum {
 
 #define GB_PRIV_DATA_HANDLER(_node_id)                                                             \
 	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_bridged_phy, okay),  \
-		    (GB_GPIO_PRIV_DATA_HANDLER(_node_id)),                                         \
+		    (GB_BRIDGED_PHY_PRIV_DATA_HANDLER(_node_id)),                                  \
 		    (IF_ENABLED(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_lights,  \
 							  okay),                                   \
 				(GB_LIGHTS_PRIV_DATA_HANDLER(_node_id)))))
@@ -62,6 +75,8 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx))
 
 #define GB_CPORT_GPIO_PRIV_DATA(_node_id, _prop, _idx) &gb_gpio_priv_data_##_idx
+
+#define GB_CPORT_PWM_PRIV_DATA(_node_id, _prop, _idx) &gb_pwm_priv_data_##_idx
 
 #define GB_CPORT(_priv, _bundle, _protocol, _driver)                                               \
 	{                                                                                          \
@@ -82,6 +97,10 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 							   (, ), _bundle, GREYBUS_PROTOCOL_GPIO,   \
 							   &gb_gpio_driver,                        \
 							   GB_CPORT_GPIO_PRIV_DATA))),             \
+		IF_ENABLED(CONFIG_GREYBUS_PWM, (DT_FOREACH_PROP_ELEM_SEP_VARGS(                    \
+						       _node_id, pwm_controllers, _GB_CPORT, (, ), \
+						       _bundle, GREYBUS_PROTOCOL_PWM,              \
+						       &gb_pwm_driver, GB_CPORT_PWM_PRIV_DATA))),  \
 		IF_ENABLED(CONFIG_GREYBUS_I2C, (DT_FOREACH_PROP_ELEM_SEP_VARGS(                    \
 						       _node_id, i2c_controllers, _GB_CPORT, (, ), \
 						       _bundle, GREYBUS_PROTOCOL_I2C,              \

@@ -1,5 +1,7 @@
 /**
  * Copyright (c) 2015 Google, Inc.
+ * Copyright (c) 2025 Ayush Singh, BeagleBoard.org
+ *
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,15 +28,13 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
+#include "greybus_messages.h"
+#include "greybus_transport.h"
 #include <stdbool.h>
-#include <string.h>
-#include <errno.h>
-
-#include <zephyr/device.h>
-#include <zephyr/device_pwm.h>
 #include <greybus/greybus.h>
 #include <zephyr/sys/byteorder.h>
+#include "greybus_pwm.h"
+#include <zephyr/drivers/pwm.h>
 
 #include <zephyr/logging/log.h>
 LOG_MODULE_REGISTER(greybus_pwm, CONFIG_GREYBUS_LOG_LEVEL);
@@ -48,494 +48,137 @@ LOG_MODULE_REGISTER(greybus_pwm, CONFIG_GREYBUS_LOG_LEVEL);
 #define GB_PWM_VERSION_MAJOR 0
 #define GB_PWM_VERSION_MINOR 1
 
-struct gb_pwm_info {
-	/** assigned CPort number */
-	uint16_t cport;
-
-	/** device type for this device */
-	char *dev_type;
-
-	/** Id for device in device table */
-	uint16_t dev_id;
-
-	/** the number of generator supported */
-	uint16_t num_pwms;
-};
-
-/**
- * @brief Get this firmware supported PWM protocol vsersion.
- *
- * This function is called when PWM operates initialize in Greybus kernel.
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
- */
-static uint8_t gb_pwm_protocol_version(struct gb_operation *operation)
+static void gb_pwm_protocol_version(uint16_t cport, struct gb_message *req)
 {
-	struct gb_pwm_version_response *response;
+	const struct gb_pwm_version_response resp_data = {
+		.major = GB_PWM_VERSION_MAJOR,
+		.minor = GB_PWM_VERSION_MINOR,
+	};
 
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	response->major = GB_PWM_VERSION_MAJOR;
-	response->minor = GB_PWM_VERSION_MINOR;
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-/**
- * @brief Get the number of generators supported from PWM controller.
- *
- * This function calls PWM controller driver to get the number of generator
- * supported and then fill into response buffer of operation pointer.
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
- */
-static uint8_t gb_pwm_protocol_count(struct gb_operation *operation)
+static void gb_pwm_protocol_count(uint16_t cport, struct gb_message *req,
+				  struct gb_pwm_driver_data *data)
 {
-	struct gb_pwm_info *pwm_info;
-	struct gb_pwm_count_response *response;
-	struct gb_bundle *bundle;
-	uint16_t count = 0;
-	int ret;
+	/* TODO: Implement properly */
+	const struct gb_pwm_count_response resp_data = {
+		.count = data->channel_num,
+	};
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	pwm_info = bundle->priv;
-
-	if (!pwm_info || !bundle->dev) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	response = gb_operation_alloc_response(operation, sizeof(*response));
-	if (!response) {
-		return GB_OP_NO_MEMORY;
-	}
-
-	ret = device_pwm_get_count(bundle->dev, &count);
-	if (ret) {
-		LOG_INF("%s(): %x error in ops", __func__, ret);
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	if (count == 0 || count > 256) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	/*
-	 * Store the number of generator supported in hardware. The num_pwms is for
-	 * checking whether specific generator number is valid in hardware or not
-	 * before pass it to device driver.
-	 */
-	pwm_info->num_pwms = count;
-
-	/*
-	 * Per Greybus specification, the number of generators supported should be
-	 * one less than the actual number.
-	 */
-	response->count = (uint8_t)count - 1;
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Activating a specific generator that system supported.
- *
- * This function will parse the gb_pwm_activate_request to get specific
- * generator number then calls PWM controller driver to activate it.
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
- */
-static uint8_t gb_pwm_protocol_activate(struct gb_operation *operation)
-{
-	struct gb_pwm_info *pwm_info;
-	struct gb_pwm_activate_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	pwm_info = bundle->priv;
-
-	if (!pwm_info || !bundle->dev) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	if (request->which >= pwm_info->num_pwms) {
-		return GB_OP_INVALID;
-	}
-
-	ret = device_pwm_activate(bundle->dev, request->which);
-	if (ret) {
-		LOG_INF("%s(): %x error in ops", __func__, ret);
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Deactivate an active generator.
- *
- * This function will parse the device_pwm_deactivate to get specific
- * generator number then calls PWM controller driver to deactivate it.
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
- */
-static uint8_t gb_pwm_protocol_deactivate(struct gb_operation *operation)
-{
-	struct gb_pwm_info *pwm_info;
-	struct gb_pwm_dectivate_request *request;
-	struct gb_bundle *bundle;
-	int ret;
-
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
-	}
-
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
-
-	pwm_info = bundle->priv;
-
-	if (!pwm_info || !bundle->dev) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	if (request->which >= pwm_info->num_pwms) {
-		return GB_OP_INVALID;
-	}
-
-	ret = device_pwm_deactivate(bundle->dev, request->which);
-	if (ret) {
-		LOG_INF("%s(): %x error in ops", __func__, ret);
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
 /**
  * @brief Configure specific generator for a particular duty cycle and period.
- *
- * This function will parse the gb_pwm_config_request to get specific generator
- * number, duty and period, and then calls PWM controller driver to configure
- * the specific generator by this particular duty and period.
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
  */
-static uint8_t gb_pwm_protocol_config(struct gb_operation *operation)
+static void gb_pwm_protocol_config(uint16_t cport, struct gb_message *req,
+				   struct gb_pwm_driver_data *data)
 {
-	struct gb_pwm_info *pwm_info;
-	struct gb_pwm_config_request *request;
-	struct gb_bundle *bundle;
-	uint32_t duty, period;
-	int ret;
+	const struct gb_pwm_config_request *req_data =
+		(const struct gb_pwm_config_request *)req->payload;
 
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
+	if (req_data->which >= data->channel_num) {
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
+	data->channel_data[req_data->which].duty = sys_le32_to_cpu(req_data->duty);
+	data->channel_data[req_data->which].period = sys_le32_to_cpu(req_data->period);
 
-	pwm_info = bundle->priv;
-
-	if (!pwm_info || !bundle->dev) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	if (request->which >= pwm_info->num_pwms) {
-		return GB_OP_INVALID;
-	}
-
-	duty = sys_le32_to_cpu(request->duty);
-	period = sys_le32_to_cpu(request->period);
-	ret = device_pwm_config(bundle->dev, request->which, duty, period);
-	if (ret) {
-		LOG_INF("%s(): %x error in ops", __func__, ret);
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_empty_response_send(req, GB_OP_SUCCESS, cport);
 }
 
 /**
  * @brief Configure specific generator for a particular polarity.
- *
- * This function will parse the gb_pwm_polarity_request to get specific
- * generator number and polarity setting, and then calls PWM controller driver
- * to configure the specific generator by this particular polarity.
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
  */
-static uint8_t gb_pwm_protocol_polarity(struct gb_operation *operation)
+static void gb_pwm_protocol_polarity(uint16_t cport, struct gb_message *req,
+				     struct gb_pwm_driver_data *data)
 {
-	struct gb_pwm_info *pwm_info;
-	struct gb_pwm_polarity_request *request;
-	struct gb_bundle *bundle;
-	int ret;
+	const struct gb_pwm_polarity_request *req_data =
+		(const struct gb_pwm_polarity_request *)req->payload;
 
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
+	if (req_data->which >= data->channel_num) {
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
+	data->channel_data[req_data->which].polarity = (req_data->polarity == 1);
 
-	pwm_info = bundle->priv;
-
-	if (!pwm_info || !bundle->dev) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	if (request->which >= pwm_info->num_pwms) {
-		return GB_OP_INVALID;
-	}
-
-	ret = device_pwm_set_polarity(bundle->dev, request->which, request->polarity);
-	if (ret) {
-		LOG_INF("%s(): %x error in ops", __func__, ret);
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	return GB_OP_SUCCESS;
+	gb_transport_message_empty_response_send(req, GB_OP_SUCCESS, cport);
 }
 
 /**
  * @brief Enable a specific generator to start toggling.
- *
- * This function will parse the gb_pwm_enable_request to get specific generator
- * number, and then calls PWM controller driver to start pulse toggling by duty
- * , period and polarity that previous configured in the specific generator.
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
  */
-static uint8_t gb_pwm_protocol_enable(struct gb_operation *operation)
+static void gb_pwm_protocol_enable(uint16_t cport, struct gb_message *req,
+				   struct gb_pwm_driver_data *data)
 {
-	struct gb_pwm_info *pwm_info;
-	struct gb_pwm_enable_request *request;
-	struct gb_bundle *bundle;
+	const struct gb_pwm_enable_request *req_data =
+		(const struct gb_pwm_enable_request *)req->payload;
+	const struct gb_pwm_channel_data *chan;
 	int ret;
 
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
+	if (req_data->which >= data->channel_num) {
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
+	chan = &data->channel_data[req_data->which];
 
-	pwm_info = bundle->priv;
-
-	if (!pwm_info || !bundle->dev) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	if (request->which >= pwm_info->num_pwms) {
-		return GB_OP_INVALID;
-	}
-
-	ret = device_pwm_enable(bundle->dev, request->which);
-	if (ret) {
-		LOG_INF("%s(): error %x in ops return", __func__, ret);
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	return GB_OP_SUCCESS;
+	ret = pwm_set(data->dev, req_data->which, chan->period, chan->duty,
+		      (chan->polarity) ? PWM_POLARITY_INVERTED : PWM_POLARITY_NORMAL);
+	gb_transport_message_empty_response_send(req, gb_errno_to_op_result(ret), cport);
 }
 
 /**
- * @brief Disable a specific generator toggling.
- *
- * This function will parse the gb_pwm_enable_request to get specific generator
- * number, and then calls PWM controller driver to stop the specific generator
- * of pulse toggling .
- *
- * @param operation Pointer to structure of gb_operation.
- *
- * @return GB_OP_SUCCESS on success, error code on failure.
+ * @brief Stop the pulse on a specific channel.
  */
-static uint8_t gb_pwm_protocol_disable(struct gb_operation *operation)
+static void gb_pwm_protocol_disable(uint16_t cport, struct gb_message *req,
+				    struct gb_pwm_driver_data *data)
 {
-	struct gb_pwm_info *pwm_info;
-	struct gb_pwm_disable_request *request;
-	struct gb_bundle *bundle;
+	const struct gb_pwm_disable_request *req_data =
+		(const struct gb_pwm_disable_request *)req->payload;
+	const struct gb_pwm_channel_data *chan;
 	int ret;
 
-	if (gb_operation_get_request_payload_size(operation) < sizeof(*request)) {
-		LOG_ERR("dropping short message");
-		return GB_OP_INVALID;
+	if (req_data->which >= data->channel_num) {
+		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	bundle = gb_operation_get_bundle(operation);
-	DEBUGASSERT(bundle);
+	chan = &data->channel_data[req_data->which];
 
-	pwm_info = bundle->priv;
-
-	if (!pwm_info || !bundle->dev) {
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	request = gb_operation_get_request_payload(operation);
-
-	if (request->which >= pwm_info->num_pwms) {
-		return GB_OP_INVALID;
-	}
-
-	ret = device_pwm_disable(bundle->dev, request->which);
-	if (ret) {
-		LOG_INF("%s(): %x error in ops", __func__, ret);
-		return GB_OP_UNKNOWN_ERROR;
-	}
-
-	return GB_OP_SUCCESS;
-}
-
-/**
- * @brief Initial the PWM protocol code and open device driver.
- *
- * This function allocate a structure pointer that defined as 'pwm_info' static
- * pointer that to store internal data and PWM controller driver handle that
- * return by device_open().
- *
- * @param cport Assigned Cport number.
- * @param bundle Greybus bundle handle
- *
- * @return (0) on success, error code on failure.
- */
-int gb_pwm_init(unsigned int cport, struct gb_bundle *bundle)
-{
-	struct gb_pwm_info *pwm_info;
-
-	DEBUGASSERT(bundle);
-
-	pwm_info = zalloc(sizeof(*pwm_info));
-	if (!pwm_info) {
-		return -ENOMEM;
-	}
-
-	pwm_info->cport = cport;
-	pwm_info->dev_type = DEVICE_TYPE_PWM_HW;
-	pwm_info->dev_id = 0;
-
-	bundle->dev = device_open(pwm_info->dev_type, pwm_info->dev_id);
-	if (!bundle->dev) {
-		free(pwm_info);
-		LOG_INF("%s(): failed to open device!", __func__);
-		return -EIO;
-	}
-
-	bundle->priv = pwm_info;
-
-	return 0;
-}
-
-/**
- * @brief Close device driver and free allocated resource.
- *
- * This function to close device driver and free any resource that allocated in
- * initialization.
- *
- * @param cport Assigned CPort number.
- * @param bundle Greybus bundle handle
- */
-void gb_pwm_exit(unsigned int cport, struct gb_bundle *bundle)
-{
-	struct gb_pwm_info *pwm_info;
-
-	DEBUGASSERT(bundle);
-
-	if (bundle->dev) {
-		device_close(bundle->dev);
-	}
-
-	pwm_info = bundle->priv;
-
-	if (pwm_info) {
-		free(pwm_info);
-		pwm_info = NULL;
-	}
+	ret = pwm_set(data->dev, req_data->which, chan->period, 0, 0);
+	gb_transport_message_empty_response_send(req, gb_errno_to_op_result(ret), cport);
 }
 
 /*
  * This structure is to define each PWM protocol operation of handling function.
  */
-static uint8_t gb_pwm_handler(uint8_t type, struct gb_operation *opr)
+static void gb_pwm_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	switch (type) {
+	struct gb_pwm_driver_data *data = (struct gb_pwm_driver_data *)priv;
+
+	switch (gb_message_type(msg)) {
 	case GB_PWM_PROTOCOL_VERSION:
-		return gb_pwm_protocol_version(opr);
+		return gb_pwm_protocol_version(cport, msg);
 	case GB_PWM_PROTOCOL_COUNT:
-		return gb_pwm_protocol_count(opr);
+		return gb_pwm_protocol_count(cport, msg, data);
+	/* No activate/deactivate for PWM. Maybe can do pm stuff at some point. */
 	case GB_PWM_PROTOCOL_ACTIVATE:
-		return gb_pwm_protocol_activate(opr);
 	case GB_PWM_PROTOCOL_DEACTIVATE:
-		return gb_pwm_protocol_deactivate(opr);
+		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 	case GB_PWM_PROTOCOL_CONFIG:
-		return gb_pwm_protocol_config(opr);
+		return gb_pwm_protocol_config(cport, msg, data);
 	case GB_PWM_PROTOCOL_POLARITY:
-		return gb_pwm_protocol_polarity(opr);
+		return gb_pwm_protocol_polarity(cport, msg, data);
 	case GB_PWM_PROTOCOL_ENABLE:
-		return gb_pwm_protocol_enable(opr);
+		return gb_pwm_protocol_enable(cport, msg, data);
 	case GB_PWM_PROTOCOL_DISABLE:
-		return gb_pwm_protocol_disable(opr);
+		return gb_pwm_protocol_disable(cport, msg, data);
 	default:
 		LOG_ERR("Invalid type");
-		return GB_OP_INVALID;
+		return gb_transport_message_empty_response_send(msg, GB_OP_PROTOCOL_BAD, cport);
 	}
 }
 
-/*
- * This structure of information is for PWM protocol fimware to register to
- * greybus.
- */
-static struct gb_driver gb_pwm_driver = {
-	.init = gb_pwm_init,
-	.exit = gb_pwm_exit,
+struct gb_driver gb_pwm_driver = {
 	.op_handler = gb_pwm_handler,
 };
-
-/**
- * @brief Register PWM protocol firmware to Greybus.
- *
- * This function is called when greybus core to enable PWM of Cport.
- */
-void gb_pwm_register(int cport, int bundle)
-{
-	gb_register_driver(cport, bundle, &gb_pwm_driver);
-}

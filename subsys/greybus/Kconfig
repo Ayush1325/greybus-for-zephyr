@@ -203,6 +203,7 @@ config GREYBUS_POWER_SUPPLY
 
 config GREYBUS_PWM
 	bool "Greybus PWM"
+	depends on PWM
 	help
 	  Select this for Greybus Pulse Width Modulation support.
 

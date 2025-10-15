@@ -40,13 +40,14 @@
 
 #define _GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id)                                             \
 	(_BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_GPIO, gpio_controllers) +                        \
-	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_I2C, i2c_controllers))
+	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_I2C, i2c_controllers) +                          \
+	 _BUNDLE_PROP_LEN(node_id, CONFIG_GREYBUS_PWM, pwm_controllers))
 
 #define _GREYBUS_CPORT_COUNTER(_node_id)                                                           \
 	COND_CODE_1(DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_bridged_phy, okay),  \
 		    (_GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(_node_id)), (1))
 
-/* 
+/*
  * Handler for cports and bundles that do not exist in DT.
  * - Control
  * - Loopback

@@ -9,6 +9,8 @@
 
 #include <zephyr/drivers/gpio.h>
 
+extern struct gb_driver gb_gpio_driver;
+
 struct gb_gpio_driver_data {
 	struct gpio_callback cb;
 	const struct device *const dev;
