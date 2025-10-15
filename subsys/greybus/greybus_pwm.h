@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+extern struct gb_driver gb_pwm_driver;
+
 struct gb_pwm_channel_data {
 	uint32_t duty;
 	uint32_t period;

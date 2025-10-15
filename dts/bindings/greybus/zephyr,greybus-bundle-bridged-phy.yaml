@@ -15,3 +15,7 @@ properties:
   i2c-controllers:
     type: phandles
     description: I2C controllers in the bundle
+
+  pwm-controllers:
+    type: phandles
+    description: PWM controllers in the bundle

@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 
+extern struct gb_driver gb_lights_driver;
+
 struct gb_lights_driver_data {
 	uint8_t lights_num;
 	const struct device **devs;
