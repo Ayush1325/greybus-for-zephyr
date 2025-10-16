@@ -50,20 +50,13 @@ enum {
 		.device_num = 0,                                                                   \
 	};
 
-#define GB_UART_PRIV_DATA(_node_id, _prop, _idx)                                                   \
-	static struct gb_uart_driver_data gb_uart_priv_data_##_idx = {                             \
-		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
-	};
-
 #define GB_BRIDGED_PHY_PRIV_DATA_HANDLER(_node_id)                                                 \
 	IF_ENABLED(GB_BRIDGED_PHY_CHECK(_node_id, gpio_controllers, CONFIG_GREYBUS_GPIO),          \
 		   (DT_FOREACH_PROP_ELEM(_node_id, gpio_controllers, GB_GPIO_PRIV_DATA)))          \
 	IF_ENABLED(GB_BRIDGED_PHY_CHECK(_node_id, spi_controllers, CONFIG_GREYBUS_SPI),            \
 		   (DT_FOREACH_PROP_ELEM(_node_id, spi_controllers, GB_SPI_PRIV_DATA)))            \
 	IF_ENABLED(GB_BRIDGED_PHY_CHECK(_node_id, pwm_controllers, CONFIG_GREYBUS_PWM),            \
-		   (DT_FOREACH_PROP_ELEM(_node_id, pwm_controllers, GB_PWM_PRIV_DATA)))            \
-	IF_ENABLED(GB_BRIDGED_PHY_CHECK(_node_id, uart_controllers, CONFIG_GREYBUS_UART),          \
-		   (DT_FOREACH_PROP_ELEM(_node_id, uart_controllers, GB_UART_PRIV_DATA)))
+		   (DT_FOREACH_PROP_ELEM(_node_id, pwm_controllers, GB_PWM_PRIV_DATA)))
 
 #define GB_LIGHTS_PRIV_DATA_ITEM(_node_id, _prop, _idx)                                            \
 	DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx))
@@ -98,8 +91,6 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 
 #define GB_CPORT_SPI_PRIV_DATA(_node_id, _prop, _idx) &gb_spi_priv_data_##_idx
 
-#define GB_CPORT_UART_PRIV_DATA(_node_id, _prop, _idx) &gb_uart_priv_data_##_idx
-
 #define GB_CPORT(_priv, _bundle, _protocol, _driver)                                               \
 	{                                                                                          \
 		.bundle = _bundle,                                                                 \
@@ -131,7 +122,7 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 			   (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, uart_controllers, _GB_CPORT,  \
 							   (, ), _bundle, GREYBUS_PROTOCOL_UART,   \
 							   &gb_uart_driver,                        \
-							   GB_CPORT_UART_PRIV_DATA))),             \
+							   GB_CPORT_DEV_PRIV_DATA))),              \
 		IF_ENABLED(CONFIG_GREYBUS_I2C, (DT_FOREACH_PROP_ELEM_SEP_VARGS(                    \
 						       _node_id, i2c_controllers, _GB_CPORT, (, ), \
 						       _bundle, GREYBUS_PROTOCOL_I2C,              \

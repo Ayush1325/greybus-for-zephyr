@@ -11,9 +11,4 @@
 
 extern struct gb_driver gb_uart_driver;
 
-struct gb_uart_driver_data {
-	const struct device *dev;
-	uint16_t cport;
-};
-
 #endif // _GREYBUS_UART_H_
