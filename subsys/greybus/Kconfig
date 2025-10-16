@@ -221,6 +221,7 @@ config GREYBUS_SPI
 config GREYBUS_UART
 	bool "Greybus UART"
 	depends on SERIAL
+	depends on UART_LINE_CTRL
 	help
 	  Select this for Greybus Universal Asynchronous Receiver Transmitter support.
 

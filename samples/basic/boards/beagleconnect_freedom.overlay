@@ -13,6 +13,7 @@
 			i2c-controllers = <&sens_i2c>;
 			pwm-controllers = <&pwm0 &pwm1>;
 			spi-controllers = <&spi0>;
+			uart-controllers = <&uart1>;
 		};
 
 		gbbundle2 {

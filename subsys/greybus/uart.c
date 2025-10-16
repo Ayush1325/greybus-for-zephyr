@@ -168,11 +168,15 @@ static void gb_uart_set_control_line_state(uint16_t cport, struct gb_message *re
 
 	ret = uart_line_ctrl_set(dev, UART_LINE_CTRL_DTR, req_data->control & GB_UART_CTRL_DTR);
 	if (ret < 0) {
+		LOG_ERR("Failed to set ctrl dtr");
 		return gb_transport_message_empty_response_send(req, gb_errno_to_op_result(ret),
 								cport);
 	}
 
 	ret = uart_line_ctrl_set(dev, UART_LINE_CTRL_RTS, req_data->control & GB_UART_CTRL_RTS);
+	if (ret < 0) {
+		LOG_ERR("Failed to set ctrl rts");
+	}
 	gb_transport_message_empty_response_send(req, gb_errno_to_op_result(ret), cport);
 }
 
@@ -228,7 +232,9 @@ free_msg:
  */
 static int gb_uart_init(const void *priv, uint16_t cport)
 {
-	const struct gb_uart_driver_data *data = priv;
+	struct gb_uart_driver_data *data = (struct gb_uart_driver_data *)priv;
+
+	data->cport = cport;
 
 	uart_irq_callback_user_data_set(data->dev, uart_irq_cb, (void *)priv);
 	uart_irq_rx_enable(data->dev);
@@ -269,7 +275,7 @@ static void gb_uart_handler(const void *priv, struct gb_message *msg, uint16_t c
 	}
 }
 
-struct gb_driver uart_driver = {
+struct gb_driver gb_uart_driver = {
 	.init = gb_uart_init,
 	.exit = gb_uart_exit,
 	.op_handler = gb_uart_handler,
