@@ -23,3 +23,7 @@ properties:
   spi-controllers:
     type: phandles
     description: SPI controllers in the bundle
+
+  uart-controllers:
+    type: phandles
+    description: UART controllers in the bundle

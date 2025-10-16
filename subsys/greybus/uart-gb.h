@@ -26,8 +26,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _GREYBUS_UART_H_
-#define _GREYBUS_UART_H_
+#ifndef __GREYBUS_UART_H__
+#define __GREYBUS_UART_H__
 
 #include <greybus/types.h>
 
@@ -90,10 +90,11 @@ struct gb_uart_receive_data_request {
 } __packed;
 
 struct gb_serial_line_coding_request {
-	__le32 rate __packed;
+	__le32 rate;
 	__u8 format; /* stop bits */
 	__u8 parity;
 	__u8 data; /* data bits */
+	__u8 flow_control;
 } __packed;
 
 struct gb_uart_set_control_line_state_request {
@@ -108,4 +109,4 @@ struct gb_uart_serial_state_request {
 	__u8 control;
 } __packed;
 
-#endif /* _GREYBUS_UART_H_ */
+#endif /* __GREYBUS_UART_H__ */
