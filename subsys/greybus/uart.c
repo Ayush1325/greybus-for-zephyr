@@ -27,6 +27,7 @@
  */
 
 #include "greybus_uart.h"
+#include <stdint.h>
 #include <string.h>
 #include <greybus/greybus.h>
 #include <zephyr/sys/byteorder.h>
@@ -191,7 +192,7 @@ static void gb_uart_send_break(uint16_t cport, struct gb_message *req, const str
 
 static void uart_irq_cb(const struct device *dev, void *user_data)
 {
-	const struct gb_uart_driver_data *data = user_data;
+	uint16_t cport = POINTER_TO_UINT(user_data);
 	struct gb_message *req;
 	struct gb_uart_receive_data_request *req_data;
 	int ret;
@@ -218,7 +219,7 @@ static void uart_irq_cb(const struct device *dev, void *user_data)
 	req->header.size =
 		ret + sizeof(struct gb_message) + sizeof(struct gb_uart_receive_data_request);
 
-	gb_transport_message_send(req, data->cport);
+	gb_transport_message_send(req, cport);
 
 free_msg:
 	gb_message_dealloc(req);
@@ -232,12 +233,10 @@ free_msg:
  */
 static int gb_uart_init(const void *priv, uint16_t cport)
 {
-	struct gb_uart_driver_data *data = (struct gb_uart_driver_data *)priv;
+	const struct device *dev = priv;
 
-	data->cport = cport;
-
-	uart_irq_callback_user_data_set(data->dev, uart_irq_cb, (void *)priv);
-	uart_irq_rx_enable(data->dev);
+	uart_irq_callback_user_data_set(dev, uart_irq_cb, UINT_TO_POINTER(cport));
+	uart_irq_rx_enable(dev);
 
 	return 0;
 }
@@ -249,26 +248,26 @@ static int gb_uart_init(const void *priv, uint16_t cport)
  */
 static void gb_uart_exit(const void *priv)
 {
-	const struct gb_uart_driver_data *data = priv;
+	const struct device *dev = priv;
 
-	uart_irq_rx_disable(data->dev);
+	uart_irq_rx_disable(dev);
 }
 
 static void gb_uart_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
-	const struct gb_uart_driver_data *data = priv;
+	const struct device *dev = priv;
 
 	switch (gb_message_type(msg)) {
 	case GB_UART_PROTOCOL_VERSION:
 		return gb_uart_protocol_version(cport, msg);
 	case GB_UART_PROTOCOL_SEND_DATA:
-		return gb_uart_send_data(cport, msg, data->dev);
+		return gb_uart_send_data(cport, msg, dev);
 	case GB_UART_PROTOCOL_SET_LINE_CODING:
-		return gb_uart_set_line_coding(cport, msg, data->dev);
+		return gb_uart_set_line_coding(cport, msg, dev);
 	case GB_UART_PROTOCOL_SET_CONTROL_LINE_STATE:
-		return gb_uart_set_control_line_state(cport, msg, data->dev);
+		return gb_uart_set_control_line_state(cport, msg, dev);
 	case GB_UART_PROTOCOL_SEND_BREAK:
-		return gb_uart_send_break(cport, msg, data->dev);
+		return gb_uart_send_break(cport, msg, dev);
 	default:
 		LOG_ERR("Invalid type");
 		return gb_transport_message_empty_response_send(msg, GB_OP_PROTOCOL_BAD, cport);
