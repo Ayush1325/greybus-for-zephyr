@@ -117,15 +117,14 @@ void gb_message_dealloc(struct gb_message *msg);
 /*
  * Allocate a greybus request message
  *
- * @param Payload
  * @param Payload len
  * @param Request Type
  * @param Is one shot
  *
  * @return greybus message allocated on heap. Null in case of error
  */
-struct gb_message *gb_message_request_alloc(const void *payload, size_t payload_len,
-					    uint8_t request_type, bool is_oneshot);
+struct gb_message *gb_message_request_alloc(size_t payload_len, uint8_t request_type,
+					    bool is_oneshot);
 
 /*
  * Allocate a greybus response message

@@ -48,13 +48,12 @@ void gb_message_dealloc(struct gb_message *msg)
 	gb_free(msg);
 }
 
-struct gb_message *gb_message_request_alloc(const void *payload, size_t payload_len,
-					    uint8_t request_type, bool is_oneshot)
+struct gb_message *gb_message_request_alloc(size_t payload_len, uint8_t request_type,
+					    bool is_oneshot)
 {
 	uint16_t operation_id = is_oneshot ? 0 : new_operation_id();
 
 	struct gb_message *msg = gb_message_alloc(payload_len, request_type, operation_id, 0);
 
-	memcpy(msg->payload, payload, payload_len);
 	return msg;
 }
