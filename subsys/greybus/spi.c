@@ -145,8 +145,7 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 
 	if (req_data->mode & (GB_SPI_MODE_NO_CS | GB_SPI_MODE_3WIRE | GB_SPI_MODE_READY)) {
 		LOG_ERR("SPI Mode %u is not supported", req_data->mode);
-		gb_transport_message_empty_response_send(req, GB_OP_INTERNAL, cport);
-		goto free_req;
+		return gb_transport_message_empty_response_send(req, GB_OP_INTERNAL, cport);
 	}
 
 	conf.slave = req_data->chip_select;
@@ -238,11 +237,10 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 	}
 
 	gb_transport_message_send(resp, cport);
+	gb_message_dealloc(req);
 
 free_resp:
 	gb_message_dealloc(resp);
-free_req:
-	gb_message_dealloc(req);
 }
 
 static void gb_spi_handler(const void *priv, struct gb_message *msg, uint16_t cport)
