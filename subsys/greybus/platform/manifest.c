@@ -58,6 +58,9 @@ struct greybus_manifest_cport {
 /* Position = Bundle ID. Value = Class */
 static uint8_t bundles[] = {
 	GREYBUS_CLASS_CONTROL,
+#ifdef CONFIG_GREYBUS_FW
+	GREYBUS_CLASS_FIRMWARE,
+#endif // CONFIG_GREYBUS_FW
 #ifdef CONFIG_GREYBUS_LOOPBACK
 	GREYBUS_CLASS_LOOPBACK,
 #endif // CONFIG_GREYBUS_LOOPBACK
