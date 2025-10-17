@@ -235,6 +235,12 @@ config GREYBUS_VIBRATOR
 	help
 	  Select this for Greybus Vibrator support.
 
+config GREYBUS_FW_MANAGEMENT
+	bool "Greybus Firmware Management"
+	depends on BOOTLOADER_MCUBOOT
+	help
+	  Select this for greybus firmware management support.
+
 config GREYBUS_SERVICE_INIT_PRIORITY
 	int "default Greybus Service Init Priority"
 	default 85
