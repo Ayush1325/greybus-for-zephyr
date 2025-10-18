@@ -17,3 +17,5 @@ manifest:
         name-allowlist:
           - hal_ti
           - cmsis_6
+          - mcuboot
+          - mbedtls

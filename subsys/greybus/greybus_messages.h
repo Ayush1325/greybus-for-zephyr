@@ -169,4 +169,9 @@ static inline struct gb_message *gb_message_response_alloc_from_req(const void *
 					 status);
 }
 
+/**
+ * Helper to get a new unique operation id.
+ */
+uint16_t new_operation_id(void);
+
 #endif

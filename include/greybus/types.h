@@ -31,6 +31,8 @@
 #ifndef __GREYBUS_TYPES_H__
 #define __GREYBUS_TYPES_H__
 
+#include <stdint.h>
+
 typedef uint8_t u8;
 typedef uint8_t __u8;
 typedef uint16_t __le16;

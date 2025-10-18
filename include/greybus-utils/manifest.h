@@ -54,11 +54,16 @@
  * - Control
  * - Loopback
  */
-#define _GREYBUS_SPECIAL_CPORTS (1 + COND_CODE_1(CONFIG_GREYBUS_LOOPBACK, (1), (0)))
+#define _GREYBUS_SPECIAL_CPORTS                                                                    \
+	(1 + COND_CODE_1(CONFIG_GREYBUS_LOOPBACK, (1), (0)) +                                      \
+	 COND_CODE_1(CONFIG_GREYBUS_FW, (2), (0)))
 
 #define GREYBUS_CPORT_COUNT                                                                        \
 	(_GREYBUS_SPECIAL_CPORTS +                                                                 \
 	 DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
+
+#define GREYBUS_FW_MANAGEMENT_CPORT 1
+#define GREYBUS_FW_DOWNLOAD_CPORT   2
 
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
 
