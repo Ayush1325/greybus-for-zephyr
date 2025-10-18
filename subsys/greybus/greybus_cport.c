@@ -13,14 +13,14 @@
 #include "greybus_pwm.h"
 #include "greybus_spi.h"
 #include "greybus_uart.h"
+#include "greybus_fw_download.h"
+#include "greybus_fw_mgmt.h"
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
 extern struct gb_driver gb_control_driver;
 extern struct gb_driver gb_i2c_driver;
 extern struct gb_driver gb_loopback_driver;
-extern struct gb_driver gb_fw_mgmt_driver;
-extern struct gb_driver gb_fw_download_driver;
 
 /* Reset the counter to 0 */
 enum {
