@@ -14,7 +14,7 @@ LOG_MODULE_REGISTER(greybus_messages, CONFIG_GREYBUS_LOG_LEVEL);
 
 static atomic_t operation_id_counter = ATOMIC_INIT(OPERATION_ID_START);
 
-static uint16_t new_operation_id(void)
+uint16_t new_operation_id(void)
 {
 	atomic_val_t temp = atomic_inc(&operation_id_counter);
 
