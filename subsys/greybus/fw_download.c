@@ -69,6 +69,7 @@ static void gb_fw_download_find_firmware_response_handler(uint16_t cport, struct
 	flash_img_init(&priv_data.ctx);
 	priv_data.fw_id = resp_data->firmware_id;
 	priv_data.fw_size = resp_data->size;
+	priv_data.offset = 0;
 
 	gb_message_dealloc(resp);
 
@@ -124,7 +125,7 @@ static void gb_fw_download_fetch_firmware_response_handler(uint16_t cport, struc
 	bool is_final_write = priv_data.offset + cur_data_size >= priv_data.fw_size;
 
 	if (!gb_message_is_success(resp)) {
-		LOG_ERR("Find firmware request failed");
+		LOG_ERR("Fetch firmware request failed");
 		return gb_message_dealloc(resp);
 	}
 
