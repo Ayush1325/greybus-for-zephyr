@@ -91,7 +91,7 @@ static int write_data(int sock, const void *data, size_t len)
 static struct gb_msg_with_cport gb_message_receive(int sock, bool *flag)
 {
 	int ret;
-	struct gb_operation_hdr hdr;
+	struct gb_operation_msg_hdr hdr;
 	struct gb_msg_with_cport msg;
 
 	ret = read_data(sock, &msg.cport, sizeof(msg.cport));
@@ -107,7 +107,8 @@ static struct gb_msg_with_cport gb_message_receive(int sock, bool *flag)
 		goto early_exit;
 	}
 
-	msg.msg = gb_message_alloc(gb_hdr_payload_len(&hdr), hdr.type, hdr.id, hdr.result);
+	msg.msg =
+		gb_message_alloc(gb_hdr_payload_len(&hdr), hdr.type, hdr.operation_id, hdr.result);
 	if (!msg.msg) {
 		LOG_ERR("Failed to allocate node message");
 		goto early_exit;
@@ -146,7 +147,7 @@ static int gb_trans_send(uint16_t cport, const struct gb_message *msg)
 
 	if (msg->header.result) {
 		LOG_INF("CPort %u, Type: %u, Result: %u, Id: %u", cport, msg->header.type,
-			msg->header.result, msg->header.id);
+			msg->header.result, msg->header.operation_id);
 	}
 
 	ret = write_data(ctx.client_sock, &cport_u16, sizeof(cport_u16));

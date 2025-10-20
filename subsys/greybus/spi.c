@@ -39,30 +39,9 @@
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include "spi-gb.h"
 #include "greybus_spi.h"
 
 LOG_MODULE_REGISTER(greybus_spi, CONFIG_GREYBUS_LOG_LEVEL);
-
-#define GB_SPI_VERSION_MAJOR 0
-#define GB_SPI_VERSION_MINOR 1
-
-/**
- * @brief Returns the major and minor Greybus SPI protocol version number
- *        supported by the SPI master
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static void gb_spi_protocol_version(uint16_t cport, struct gb_message *req)
-{
-	const struct gb_spi_proto_version_response resp_data = {
-		.major = GB_SPI_VERSION_MAJOR,
-		.minor = GB_SPI_VERSION_MINOR,
-	};
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
 
 /**
  * @brief Returns a set of configuration parameters related to SPI master.
@@ -113,7 +92,7 @@ static void gb_spi_protocol_device_config(uint16_t cport, struct gb_message *req
 	 */
 	dev_data.max_speed_hz = 24000000;
 	dev_data.mode = 0;
-	dev_data.bpw = 0;
+	dev_data.bits_per_word = 0;
 	dev_data.device_type = GB_SPI_SPI_DEV;
 
 	gb_transport_message_response_success_send(req, &dev_data, sizeof(dev_data), cport);
@@ -128,7 +107,7 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 {
 	int ret;
 	struct gb_spi_transfer_request *req_data = (struct gb_spi_transfer_request *)req->payload;
-	struct gb_spi_transfer_desc *desc;
+	struct gb_spi_transfer *desc;
 	struct spi_config conf = {0};
 	size_t i, resp_pos = 0, resp_size = 0;
 	struct gb_message *resp;
@@ -168,13 +147,13 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 	/* Calculate the response size */
 	for (i = 0; i < req_data->count; ++i) {
 		desc = &req_data->transfers[i];
-		if (desc->rdwr & GB_SPI_XFER_READ) {
+		if (desc->xfer_flags & GB_SPI_XFER_READ) {
 			resp_size += desc->len;
 		}
 	}
 
-	resp = gb_message_alloc(resp_size, GB_RESPONSE(GB_SPI_PROTOCOL_TRANSFER), req->header.id,
-				GB_OP_SUCCESS);
+	resp = gb_message_alloc(resp_size, GB_RESPONSE(GB_SPI_TYPE_TRANSFER),
+				req->header.operation_id, GB_OP_SUCCESS);
 	for (i = 0; i < req_data->count; ++i) {
 		desc = &req_data->transfers[i];
 		conf.frequency = desc->speed_hz;
@@ -186,7 +165,8 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 			goto free_resp;
 		}
 
-		if ((desc->rdwr & GB_SPI_XFER_READ) && (desc->rdwr & GB_SPI_XFER_WRITE)) {
+		if ((desc->xfer_flags & GB_SPI_XFER_READ) &&
+		    (desc->xfer_flags & GB_SPI_XFER_WRITE)) {
 			rx_buf.buf = resp->payload + resp_pos;
 			rx_buf.len = desc->len;
 			tx_buf.buf = trans_data;
@@ -202,7 +182,7 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 
 			trans_data += desc->len;
 			resp_pos += desc->len;
-		} else if (desc->rdwr & GB_SPI_XFER_READ) {
+		} else if (desc->xfer_flags & GB_SPI_XFER_READ) {
 			rx_buf.buf = resp->payload + resp_pos;
 			rx_buf.len = desc->len;
 
@@ -215,7 +195,7 @@ static void gb_spi_protocol_transfer(uint16_t cport, struct gb_message *req,
 			}
 
 			resp_pos += desc->len;
-		} else if (desc->rdwr & GB_SPI_XFER_WRITE) {
+		} else if (desc->xfer_flags & GB_SPI_XFER_WRITE) {
 			tx_buf.buf = trans_data;
 			tx_buf.len = desc->len;
 			ret = spi_write(data->dev, &conf, &tx_buf_set);
@@ -248,13 +228,11 @@ static void gb_spi_handler(const void *priv, struct gb_message *msg, uint16_t cp
 	const struct gb_spi_driver_data *data = priv;
 
 	switch (gb_message_type(msg)) {
-	case GB_SPI_PROTOCOL_VERSION:
-		return gb_spi_protocol_version(cport, msg);
 	case GB_SPI_TYPE_MASTER_CONFIG:
 		return gb_spi_protocol_master_config(cport, msg, data);
 	case GB_SPI_TYPE_DEVICE_CONFIG:
 		return gb_spi_protocol_device_config(cport, msg, data);
-	case GB_SPI_PROTOCOL_TRANSFER:
+	case GB_SPI_TYPE_TRANSFER:
 		return gb_spi_protocol_transfer(cport, msg, data);
 	default:
 		LOG_ERR("Invalid type");

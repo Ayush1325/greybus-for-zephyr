@@ -126,7 +126,8 @@ static void gb_pending_message_worker(void *p1, void *p2, void *p3)
 		}
 
 		LOG_DBG("CPort: %d, Type: %d, Result: %d, Id: %u", msg.cport,
-			gb_message_type(msg.msg), msg.msg->header.result, msg.msg->header.id);
+			gb_message_type(msg.msg), msg.msg->header.result,
+			msg.msg->header.operation_id);
 
 		gb_process_msg(msg.msg, msg.cport);
 	}

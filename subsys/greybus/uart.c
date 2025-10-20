@@ -32,14 +32,10 @@
 #include <greybus/greybus.h>
 #include <zephyr/sys/byteorder.h>
 #include "greybus_transport.h"
-
 #include <zephyr/logging/log.h>
+#include <greybus/greybus_protocols.h>
+
 LOG_MODULE_REGISTER(greybus_uart, CONFIG_GREYBUS_LOG_LEVEL);
-
-#include "uart-gb.h"
-
-#define GB_UART_VERSION_MAJOR 0
-#define GB_UART_VERSION_MINOR 1
 
 /* Reserved buffer for rx data. */
 #define MAX_RX_BUF_SIZE 64
@@ -47,19 +43,6 @@ LOG_MODULE_REGISTER(greybus_uart, CONFIG_GREYBUS_LOG_LEVEL);
 /* The id of error in protocol operating. */
 #define GB_UART_EVENT_PROTOCOL_ERROR 1
 #define GB_UART_EVENT_DEVICE_ERROR   2
-
-/**
- * @brief Protocol get version function.
- */
-static void gb_uart_protocol_version(uint16_t cport, struct gb_message *req)
-{
-	const struct gb_uart_proto_version_response resp_data = {
-		.major = GB_UART_VERSION_MAJOR,
-		.minor = GB_UART_VERSION_MINOR,
-	};
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
 
 /**
  * @brief Protocol send data function.
@@ -84,8 +67,8 @@ static void gb_uart_set_line_coding(uint16_t cport, struct gb_message *req,
 				    const struct device *dev)
 {
 	int ret;
-	const struct gb_serial_line_coding_request *req_data =
-		(const struct gb_serial_line_coding_request *)req->payload;
+	const struct gb_uart_set_line_coding_request *req_data =
+		(const struct gb_uart_set_line_coding_request *)req->payload;
 	struct uart_config conf = {
 		.baudrate = sys_le32_to_cpu(req_data->rate),
 	};
@@ -124,7 +107,7 @@ static void gb_uart_set_line_coding(uint16_t cport, struct gb_message *req,
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	switch (req_data->data) {
+	switch (req_data->data_bits) {
 	case 5:
 		conf.data_bits = UART_CFG_DATA_BITS_5;
 		break;
@@ -194,19 +177,19 @@ static void uart_irq_cb(const struct device *dev, void *user_data)
 {
 	uint16_t cport = POINTER_TO_UINT(user_data);
 	struct gb_message *req;
-	struct gb_uart_receive_data_request *req_data;
+	struct gb_uart_recv_data_request *req_data;
 	int ret;
 
 	if (!uart_irq_update(dev) && !uart_irq_rx_ready(dev)) {
 		return;
 	}
 
-	req = gb_message_request_alloc(MAX_RX_BUF_SIZE, GB_UART_PROTOCOL_RECEIVE_DATA, false);
+	req = gb_message_request_alloc(MAX_RX_BUF_SIZE, GB_UART_TYPE_RECEIVE_DATA, false);
 	if (!req) {
 		LOG_ERR("Failed to allocate message");
 		return;
 	}
-	req_data = (struct gb_uart_receive_data_request *)req->payload;
+	req_data = (struct gb_uart_recv_data_request *)req->payload;
 
 	ret = uart_fifo_read(dev, req_data->data, MAX_RX_BUF_SIZE);
 	if (ret < 0) {
@@ -217,7 +200,7 @@ static void uart_irq_cb(const struct device *dev, void *user_data)
 	req_data->flags = 0;
 	req_data->size = ret;
 	req->header.size =
-		ret + sizeof(struct gb_message) + sizeof(struct gb_uart_receive_data_request);
+		ret + sizeof(struct gb_message) + sizeof(struct gb_uart_recv_data_request);
 
 	gb_transport_message_send(req, cport);
 
@@ -258,15 +241,13 @@ static void gb_uart_handler(const void *priv, struct gb_message *msg, uint16_t c
 	const struct device *dev = priv;
 
 	switch (gb_message_type(msg)) {
-	case GB_UART_PROTOCOL_VERSION:
-		return gb_uart_protocol_version(cport, msg);
-	case GB_UART_PROTOCOL_SEND_DATA:
+	case GB_UART_TYPE_SEND_DATA:
 		return gb_uart_send_data(cport, msg, dev);
-	case GB_UART_PROTOCOL_SET_LINE_CODING:
+	case GB_UART_TYPE_SET_LINE_CODING:
 		return gb_uart_set_line_coding(cport, msg, dev);
-	case GB_UART_PROTOCOL_SET_CONTROL_LINE_STATE:
+	case GB_UART_TYPE_SET_CONTROL_LINE_STATE:
 		return gb_uart_set_control_line_state(cport, msg, dev);
-	case GB_UART_PROTOCOL_SEND_BREAK:
+	case GB_UART_TYPE_SEND_BREAK:
 		return gb_uart_send_break(cport, msg, dev);
 	default:
 		LOG_ERR("Invalid type");

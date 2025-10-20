@@ -63,7 +63,7 @@ static inline void gb_transport_message_empty_response_send(struct gb_message *r
 		.header =
 			{
 				.size = sizeof(struct gb_message),
-				.id = req->header.id,
+				.operation_id = req->header.operation_id,
 				.pad = {0, 0},
 				.type = GB_RESPONSE(req->header.type),
 				.result = status,

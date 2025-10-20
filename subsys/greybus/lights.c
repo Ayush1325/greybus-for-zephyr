@@ -30,42 +30,17 @@
 
 #include <stdbool.h>
 #include <string.h>
-
 #include <zephyr/device.h>
 #include <greybus/greybus.h>
 #include <zephyr/sys/byteorder.h>
-
 #include "greybus_messages.h"
 #include "greybus_transport.h"
-#include "lights-gb.h"
 #include "greybus_lights.h"
-
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/led.h>
+#include <greybus/greybus_protocols.h>
 
 LOG_MODULE_REGISTER(greybus_lights, CONFIG_GREYBUS_LOG_LEVEL);
-
-#define GB_LIGHTS_VERSION_MAJOR 0
-#define GB_LIGHTS_VERSION_MINOR 1
-
-/**
- * @brief Returns the major and minor Greybus Lights Protocol version number
- *
- * This operation returns the major and minor version number supported by
- * Greybus Lights Protocol
- *
- * @param operation pointer to structure of Greybus operation message
- * @return GB_OP_SUCCESS on success, error code on failure
- */
-static void gb_lights_protocol_version(uint16_t cport, struct gb_message *req)
-{
-	const struct gb_lights_version_response resp_data = {
-		.major = GB_LIGHTS_VERSION_MAJOR,
-		.minor = GB_LIGHTS_VERSION_MINOR,
-	};
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
 
 /**
  * @brief Returns lights count of lights driver
@@ -177,8 +152,6 @@ static void gb_lights_handler(const void *priv, struct gb_message *msg, uint16_t
 	const struct gb_lights_driver_data *data = priv;
 
 	switch (gb_message_type(msg)) {
-	case GB_LIGHTS_TYPE_PROTOCOL_VERSION:
-		return gb_lights_protocol_version(cport, msg);
 	case GB_LIGHTS_TYPE_GET_LIGHTS:
 		return gb_lights_get_lights(cport, msg, data);
 	case GB_LIGHTS_TYPE_GET_LIGHT_CONFIG:

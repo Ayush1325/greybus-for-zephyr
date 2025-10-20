@@ -2,6 +2,7 @@
 /*
  * Copyright(c) 2014 - 2015 Google Inc. All rights reserved.
  * Copyright(c) 2014 - 2015 Linaro Ltd. All rights reserved.
+ * Copyright(c) 2025 Ayush Singh, BeagleBoard.org
  */
 
 #ifndef __GREYBUS_PROTOCOLS_H
@@ -368,10 +369,11 @@ struct gb_cap_authenticate_response {
 #define GB_BOOTROM_TYPE_GET_VID_PID   0x06 /* Request with no-payload */
 
 /* Greybus bootrom boot stages */
-#define GB_BOOTROM_BOOT_STAGE_ONE   0x01 /* Reserved for the boot ROM */
-#define GB_BOOTROM_BOOT_STAGE_TWO   0x02 /* Bootrom package to be loaded by the boot ROM */
-#define GB_BOOTROM_BOOT_STAGE_THREE 0x03 /* Module personality package loaded by Stage 2 firmware  \
-					  */
+#define GB_BOOTROM_BOOT_STAGE_ONE 0x01 /* Reserved for the boot ROM */
+#define GB_BOOTROM_BOOT_STAGE_TWO 0x02 /* Bootrom package to be loaded by the boot ROM */
+#define GB_BOOTROM_BOOT_STAGE_THREE                                                                \
+	0x03 /* Module personality package loaded by Stage 2 firmware                              \
+	      */
 
 /* Greybus bootrom ready to boot status */
 #define GB_BOOTROM_BOOT_STATUS_INVALID  0x00 /* Firmware blob could not be validated */
@@ -646,6 +648,23 @@ struct gb_hid_input_report_request {
 
 /* functionality request has no payload */
 struct gb_i2c_functionality_response {
+#define GB_I2C_FUNC_I2C                    0x00000001
+#define GB_I2C_FUNC_10BIT_ADDR             0x00000002
+#define GB_I2C_FUNC_SMBUS_PEC              0x00000008
+#define GB_I2C_FUNC_NOSTART                0x00000010
+#define GB_I2C_FUNC_SMBUS_BLOCK_PROC_CALL  0x00008000
+#define GB_I2C_FUNC_SMBUS_QUICK            0x00010000
+#define GB_I2C_FUNC_SMBUS_READ_BYTE        0x00020000
+#define GB_I2C_FUNC_SMBUS_WRITE_BYTE       0x00040000
+#define GB_I2C_FUNC_SMBUS_READ_BYTE_DATA   0x00080000
+#define GB_I2C_FUNC_SMBUS_WRITE_BYTE_DATA  0x00100000
+#define GB_I2C_FUNC_SMBUS_READ_WORD_DATA   0x00200000
+#define GB_I2C_FUNC_SMBUS_WRITE_WORD_DATA  0x00400000
+#define GB_I2C_FUNC_SMBUS_PROC_CALL        0x00800000
+#define GB_I2C_FUNC_SMBUS_READ_BLOCK_DATA  0x01000000
+#define GB_I2C_FUNC_SMBUS_WRITE_BLOCK_DATA 0x02000000
+#define GB_I2C_FUNC_SMBUS_READ_I2C_BLOCK   0x04000000
+#define GB_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK  0x08000000
 	__le32 functionality;
 } __packed;
 
@@ -661,6 +680,10 @@ struct gb_i2c_functionality_response {
  */
 struct gb_i2c_transfer_op {
 	__le16 addr;
+#define GB_I2C_M_RD       0x0001
+#define GB_I2C_M_TEN      0x0010
+#define GB_I2C_M_RECV_LEN 0x0400
+#define GB_I2C_M_NOSTART  0x4000
 	__le16 flags;
 	__le16 size;
 } __packed;

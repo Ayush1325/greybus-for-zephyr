@@ -37,15 +37,17 @@
 #include <greybus-utils/manifest.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"
-
 #include <zephyr/logging/log.h>
+#include <greybus/greybus_protocols.h>
+
 LOG_MODULE_REGISTER(greybus_control, CONFIG_GREYBUS_LOG_LEVEL);
 
-#include "control-gb.h"
+#define GB_CONTROL_VERSION_MAJOR 0
+#define GB_CONTROL_VERSION_MINOR 1
 
 static void gb_control_protocol_version(uint16_t cport, struct gb_message *req)
 {
-	const struct gb_control_proto_version_response resp_data = {
+	const struct gb_control_version_request resp_data = {
 		.major = GB_CONTROL_VERSION_MAJOR,
 		.minor = GB_CONTROL_VERSION_MINOR,
 	};
@@ -65,7 +67,7 @@ static void gb_control_get_manifest_size(uint16_t cport, struct gb_message *req)
 static void gb_control_get_manifest(uint16_t cport, struct gb_message *req)
 {
 	struct gb_message *msg = gb_message_alloc(manifest_size(), GB_RESPONSE(req->header.type),
-						  req->header.id, GB_OP_SUCCESS);
+						  req->header.operation_id, GB_OP_SUCCESS);
 
 	manifest_create(msg->payload, manifest_size());
 
@@ -146,22 +148,12 @@ static void gb_control_pm_stub(uint16_t cport, struct gb_message *req)
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
-static void gb_control_interface_version(uint16_t cport, struct gb_message *req)
-{
-	const struct gb_control_interface_version_response resp_data = {
-		.major = sys_cpu_to_le16(GB_INTERFACE_VERSION_MAJOR),
-		.minor = sys_cpu_to_le16(GB_INTERFACE_VERSION_MINOR),
-	};
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
-
 static void gb_control_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
 	ARG_UNUSED(priv);
 
 	switch (gb_message_type(msg)) {
-	case GB_CONTROL_TYPE_PROTOCOL_VERSION:
+	case GB_CONTROL_TYPE_VERSION:
 		return gb_control_protocol_version(cport, msg);
 	case GB_CONTROL_TYPE_GET_MANIFEST_SIZE:
 		return gb_control_get_manifest_size(cport, msg);
@@ -171,8 +163,6 @@ static void gb_control_handler(const void *priv, struct gb_message *msg, uint16_
 		return gb_control_connected(cport, msg);
 	case GB_CONTROL_TYPE_DISCONNECTED:
 		return gb_control_disconnected(cport, msg);
-	case GB_CONTROL_TYPE_INTERFACE_VERSION:
-		return gb_control_interface_version(cport, msg);
 	case GB_CONTROL_TYPE_DISCONNECTING:
 		return gb_control_disconnecting(cport, msg);
 	case GB_CONTROL_TYPE_BUNDLE_ACTIVATE:
