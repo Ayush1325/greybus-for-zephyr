@@ -8,7 +8,7 @@
 #define _GREYBUS_SPI_H_
 
 #include <stdint.h>
-#include "spi-gb.h"
+#include <greybus/greybus_protocols.h>
 
 extern struct gb_driver gb_spi_driver;
 

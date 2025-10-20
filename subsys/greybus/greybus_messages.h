@@ -9,6 +9,7 @@
 #include <zephyr/types.h>
 #include <zephyr/sys/byteorder.h>
 #include <greybus/greybus.h>
+#include <greybus/greybus_protocols.h>
 
 /*
  * Struct to represent greybus message. This is a variable sized type.
@@ -18,7 +19,7 @@
  * @param payload: heap allocated payload.
  */
 struct gb_message {
-	struct gb_operation_hdr header;
+	struct gb_operation_msg_hdr header;
 	uint8_t payload[];
 };
 
@@ -29,9 +30,9 @@ struct gb_message {
  *
  * @return payload length
  */
-static inline size_t gb_hdr_payload_len(const struct gb_operation_hdr *hdr)
+static inline size_t gb_hdr_payload_len(const struct gb_operation_msg_hdr *hdr)
 {
-	return sys_le16_to_cpu(hdr->size) - sizeof(struct gb_operation_hdr);
+	return sys_le16_to_cpu(hdr->size) - sizeof(struct gb_operation_msg_hdr);
 }
 
 /*
@@ -53,7 +54,7 @@ static inline size_t gb_message_payload_len(const struct gb_message *msg)
  *
  * @return true if message is response, else false.
  */
-static inline bool gb_hdr_is_response(const struct gb_operation_hdr *hdr)
+static inline bool gb_hdr_is_response(const struct gb_operation_msg_hdr *hdr)
 {
 	return hdr->type & GB_TYPE_RESPONSE_FLAG;
 }
@@ -65,7 +66,7 @@ static inline bool gb_hdr_is_response(const struct gb_operation_hdr *hdr)
  *
  * @return true if message is successful, else false.
  */
-static inline bool gb_hdr_is_success(const struct gb_operation_hdr *hdr)
+static inline bool gb_hdr_is_success(const struct gb_operation_msg_hdr *hdr)
 {
 	return hdr->result == GB_OP_SUCCESS;
 }
@@ -165,8 +166,8 @@ static inline struct gb_message *gb_message_response_alloc_from_req(const void *
 								    struct gb_message *req,
 								    uint8_t status)
 {
-	return gb_message_response_alloc(payload, payload_len, gb_message_type(req), req->header.id,
-					 status);
+	return gb_message_response_alloc(payload, payload_len, gb_message_type(req),
+					 req->header.operation_id, status);
 }
 
 /**

@@ -35,28 +35,10 @@
 #include <zephyr/sys/byteorder.h>
 #include "greybus_pwm.h"
 #include <zephyr/drivers/pwm.h>
-
 #include <zephyr/logging/log.h>
+#include <greybus/greybus_protocols.h>
+
 LOG_MODULE_REGISTER(greybus_pwm, CONFIG_GREYBUS_LOG_LEVEL);
-
-#include "pwm-gb.h"
-
-/**
- * A Greybus PWM controller adhering to the Protocol specified herein shall
- * report major version 0, minor version 1.
- */
-#define GB_PWM_VERSION_MAJOR 0
-#define GB_PWM_VERSION_MINOR 1
-
-static void gb_pwm_protocol_version(uint16_t cport, struct gb_message *req)
-{
-	const struct gb_pwm_version_response resp_data = {
-		.major = GB_PWM_VERSION_MAJOR,
-		.minor = GB_PWM_VERSION_MINOR,
-	};
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
 
 static void gb_pwm_protocol_count(uint16_t cport, struct gb_message *req,
 				  struct gb_pwm_driver_data *data)
@@ -157,21 +139,19 @@ static void gb_pwm_handler(const void *priv, struct gb_message *msg, uint16_t cp
 	struct gb_pwm_driver_data *data = (struct gb_pwm_driver_data *)priv;
 
 	switch (gb_message_type(msg)) {
-	case GB_PWM_PROTOCOL_VERSION:
-		return gb_pwm_protocol_version(cport, msg);
-	case GB_PWM_PROTOCOL_COUNT:
+	case GB_PWM_TYPE_PWM_COUNT:
 		return gb_pwm_protocol_count(cport, msg, data);
 	/* No activate/deactivate for PWM. Maybe can do pm stuff at some point. */
-	case GB_PWM_PROTOCOL_ACTIVATE:
-	case GB_PWM_PROTOCOL_DEACTIVATE:
+	case GB_PWM_TYPE_ACTIVATE:
+	case GB_PWM_TYPE_DEACTIVATE:
 		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
-	case GB_PWM_PROTOCOL_CONFIG:
+	case GB_PWM_TYPE_CONFIG:
 		return gb_pwm_protocol_config(cport, msg, data);
-	case GB_PWM_PROTOCOL_POLARITY:
+	case GB_PWM_TYPE_POLARITY:
 		return gb_pwm_protocol_polarity(cport, msg, data);
-	case GB_PWM_PROTOCOL_ENABLE:
+	case GB_PWM_TYPE_ENABLE:
 		return gb_pwm_protocol_enable(cport, msg, data);
-	case GB_PWM_PROTOCOL_DISABLE:
+	case GB_PWM_TYPE_DISABLE:
 		return gb_pwm_protocol_disable(cport, msg, data);
 	default:
 		LOG_ERR("Invalid type");

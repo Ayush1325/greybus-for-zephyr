@@ -38,23 +38,9 @@
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include "greybus_gpio.h"
-
-#include "gpio-gb.h"
+#include <greybus/greybus_protocols.h>
 
 LOG_MODULE_REGISTER(greybus_gpio, CONFIG_GREYBUS_LOG_LEVEL);
-
-#define GB_GPIO_VERSION_MAJOR 0
-#define GB_GPIO_VERSION_MINOR 1
-
-static void gb_gpio_protocol_version(uint16_t cport, struct gb_message *req)
-{
-	const struct gb_gpio_proto_version_response resp_data = {
-		.major = GB_GPIO_VERSION_MAJOR,
-		.minor = GB_GPIO_VERSION_MINOR,
-	};
-
-	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
-}
 
 static void gb_gpio_line_count(uint16_t cport, struct gb_message *req, const struct device *dev)
 {
@@ -285,8 +271,6 @@ static void gb_gpio_handler(const void *priv, struct gb_message *msg, uint16_t c
 	const struct gb_gpio_driver_data *data = priv;
 
 	switch (gb_message_type(msg)) {
-	case GB_GPIO_TYPE_PROTOCOL_VERSION:
-		return gb_gpio_protocol_version(cport, msg);
 	case GB_GPIO_TYPE_LINE_COUNT:
 		return gb_gpio_line_count(cport, msg, data->dev);
 	case GB_GPIO_TYPE_ACTIVATE:
@@ -318,7 +302,7 @@ static void gb_gpio_handler(const void *priv, struct gb_message *msg, uint16_t c
 }
 
 struct gpio_irq_event_request_msg {
-	struct gb_operation_hdr hdr;
+	struct gb_operation_msg_hdr hdr;
 	struct gb_gpio_irq_event_request body;
 } __packed;
 

@@ -31,26 +31,12 @@
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <sys/time.h>
-
 #include <greybus/greybus.h>
-#include <greybus/loopback.h>
 #include <zephyr/sys/byteorder.h>
-
 #include <zephyr/logging/log.h>
+#include <greybus/greybus_protocols.h>
+
 LOG_MODULE_REGISTER(greybus_loopback, CONFIG_GREYBUS_LOG_LEVEL);
-
-#define GB_LOOPBACK_VERSION_MAJOR 0
-#define GB_LOOPBACK_VERSION_MINOR 1
-
-static void gb_loopback_protocol_ver_cb(uint16_t cport, struct gb_message *req)
-{
-	const struct gb_loopback_proto_version_response response = {
-		.major = GB_LOOPBACK_VERSION_MAJOR,
-		.minor = GB_LOOPBACK_VERSION_MINOR,
-	};
-
-	gb_transport_message_response_success_send(req, &response, sizeof(response), cport);
-}
 
 static void gb_loopback_transfer_req_cb(struct gb_message *req, uint16_t cport)
 {
@@ -67,8 +53,6 @@ static void gb_loopback_handler(const void *priv, struct gb_message *msg, uint16
 	ARG_UNUSED(priv);
 
 	switch (gb_message_type(msg)) {
-	case GB_LOOPBACK_TYPE_PROTOCOL_VERSION:
-		return gb_loopback_protocol_ver_cb(cport, msg);
 	case GB_LOOPBACK_TYPE_PING:
 		return gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 	case GB_LOOPBACK_TYPE_TRANSFER:

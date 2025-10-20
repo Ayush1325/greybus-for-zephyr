@@ -37,21 +37,6 @@
 #include <zephyr/sys/dlist.h>
 #include <greybus/types.h>
 
-#ifndef OK
-enum {
-	OK
-};
-#endif
-
-#define GB_MTU                  2048
-#define GB_MAX_PAYLOAD_SIZE     (GB_MTU - sizeof(struct gb_operation_hdr))
-#define GB_TIMESYNC_MAX_STROBES 0x04
-
-#define CONTROL_BUNDLE_ID 0x00
-#define CONTROL_CPORT_ID  0x00
-
-#define GB_INVALID_TYPE 0x7f
-
 enum gb_event {
 	GB_EVT_CONNECTED,
 	GB_EVT_DISCONNECTED,
@@ -94,14 +79,6 @@ struct gb_driver {
 	void (*disconnected)(const void *priv);
 
 	gb_operation_handler_t op_handler;
-};
-
-struct gb_operation_hdr {
-	__le16 size;
-	__le16 id;
-	__u8 type;
-	__u8 result; /* present in response only */
-	__u8 pad[2];
 };
 
 enum gb_operation_type {

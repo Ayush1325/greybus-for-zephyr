@@ -135,21 +135,6 @@ config GREYBUS_XPORT_TCPIP
 	help
 	  This creates a TCP/IP service for Greybus multiplex over single socket.
 
-config GREYBUS_XPORT_UART
-	bool "Use the UART Transport for Greybus"
-	depends on SERIAL
-	depends on SERIAL_HAS_DRIVER
-	help
-	  This creates a thread for Greybus on a specific UART.
-
-if GREYBUS_XPORT_UART
-config GREYBUS_XPORT_UART_DEV
-	string "Run Greybus on which UART?"
-	default "UART_1"
-	help
-	  This setting specifies which UART the Greybus service will use.
-endif # GREYBUS_XPORT_UART
-
 config GREYBUS_XPORT_DUMMY
 	bool "Use the dummy Transport for Greybus"
 	help
