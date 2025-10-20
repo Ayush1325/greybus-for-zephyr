@@ -15,6 +15,7 @@
 #include "greybus_uart.h"
 #include "greybus_fw_download.h"
 #include "greybus_fw_mgmt.h"
+#include "greybus_log.h"
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
@@ -147,16 +148,19 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 #define GB_CPORTS_FW(_bundle)                                                                      \
 	GB_CPORT(NULL, _bundle, GREYBUS_PROTOCOL_FIRMWARE_MANAGEMENT, &gb_fw_mgmt_driver),         \
 		GB_CPORT(NULL, _bundle, GREYBUS_PROTOCOL_FIRMWARE_DOWNLOAD,                        \
-			 &gb_fw_download_driver),
+			 &gb_fw_download_driver)
 
 static struct gb_cport cports[] = {
 	/* cport0 is always control cport */
 	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_CONTROL, &gb_control_driver),
 #ifdef CONFIG_GREYBUS_FW
-	GB_CPORTS_FW(LOCAL_COUNTER)
+	GB_CPORTS_FW(LOCAL_COUNTER),
 #endif // CONFIG_GREYBUS_FW
+#ifdef CONFIG_GREYBUS_LOG
+	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_LOG, &gb_log_driver),
+#endif // CONFIG_GREYBUS_LOG
 #ifdef CONFIG_GREYBUS_LOOPBACK
-		GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_LOOPBACK, &gb_loopback_driver),
+	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_LOOPBACK, &gb_loopback_driver),
 #endif // CONFIG_GREYBUS_LOOPBACK
 	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_CPORTS_BUNDLE_WRAPPER)};
 
