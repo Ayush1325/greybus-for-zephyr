@@ -56,7 +56,8 @@
  */
 #define _GREYBUS_SPECIAL_CPORTS                                                                    \
 	(1 + COND_CODE_1(CONFIG_GREYBUS_LOOPBACK, (1), (0)) +                                      \
-	 COND_CODE_1(CONFIG_GREYBUS_FW, (2), (0)))
+	 COND_CODE_1(CONFIG_GREYBUS_FW, (2), (0)) +                                                \
+	 COND_CODE_1(CONFIG_GREYBUS_LOG_BACKEND, (1), (0)))
 
 #define GREYBUS_CPORT_COUNT                                                                        \
 	(_GREYBUS_SPECIAL_CPORTS +                                                                 \
@@ -64,6 +65,7 @@
 
 #define GREYBUS_FW_MANAGEMENT_CPORT 1
 #define GREYBUS_FW_DOWNLOAD_CPORT   2
+#define GREYBUS_LOG_CPORT           COND_CODE_1(CONFIG_GREYBUS_FW, (3), (1))
 
 typedef void (*manifest_handler)(unsigned char *manifest_file, int device_id, int manifest_number);
 
