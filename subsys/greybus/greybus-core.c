@@ -125,13 +125,9 @@ static void gb_pending_message_worker(void *p1, void *p2, void *p3)
 			continue;
 		}
 
-		if (COND_CODE_1(CONFIG_GREYBUS_LOG,
-				(gb_message_type(msg.msg) != GB_RESPONSE(GB_LOG_TYPE_SEND_LOG)),
-				(true))) {
-			LOG_DBG("CPort: %d, Type: %d, Result: %d, Id: %u", msg.cport,
-				gb_message_type(msg.msg), msg.msg->header.result,
-				msg.msg->header.operation_id);
-		}
+		LOG_DBG("CPort: %d, Type: %d, Result: %d, Id: %u", msg.cport,
+			gb_message_type(msg.msg), msg.msg->header.result,
+			msg.msg->header.operation_id);
 
 		gb_process_msg(msg.msg, msg.cport);
 	}

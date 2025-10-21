@@ -11,4 +11,6 @@
 
 extern struct gb_driver gb_log_driver;
 
+void gb_log_send_log(uint16_t len, const char *log);
+
 #endif // _GREYBUS_LOG_H_
