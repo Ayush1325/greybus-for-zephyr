@@ -181,8 +181,9 @@ config GREYBUS_LOOPBACK
 	help
 	  Select this for Greybus Loopback support.
 
-config GREYBUS_LOG
+config GREYBUS_LOG_BACKEND
 	bool "Greybus Log"
+	depends on LOG
 	help
 	  Select this for Greybus log support.
 

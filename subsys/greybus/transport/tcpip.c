@@ -3,7 +3,6 @@
 #include <zephyr/net/dns_sd.h>
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
-
 #include "../platform/certificate.h"
 #include "../greybus_messages.h"
 
@@ -143,7 +142,7 @@ static int gb_trans_listen_stop(uint16_t cport)
 static int gb_trans_send(uint16_t cport, const struct gb_message *msg)
 {
 	int ret;
-	const __le16 cport_u16 = sys_cpu_to_le16(cport);
+	__le16 cport_u16 = sys_cpu_to_le16(cport);
 
 	if (msg->header.result) {
 		LOG_INF("CPort %u, Type: %u, Result: %u, Id: %u", cport, msg->header.type,

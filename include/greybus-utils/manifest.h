@@ -56,7 +56,7 @@
  */
 #define _GREYBUS_SPECIAL_CPORTS                                                                    \
 	(1 + COND_CODE_1(CONFIG_GREYBUS_LOOPBACK, (1), (0)) +                                      \
-	 COND_CODE_1(CONFIG_GREYBUS_FW, (2), (0)) + COND_CODE_1(CONFIG_GREYBUS_LOG, (1), (0)))
+	 COND_CODE_1(CONFIG_GREYBUS_FW, (2), (0)) + COND_CODE_1(CONFIG_GREYBUS_LOG_BACKEND, (1), (0)))
 
 #define GREYBUS_CPORT_COUNT                                                                        \
 	(_GREYBUS_SPECIAL_CPORTS +                                                                 \

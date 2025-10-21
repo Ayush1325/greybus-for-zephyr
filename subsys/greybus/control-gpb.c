@@ -81,20 +81,21 @@ static void gb_control_connected(uint16_t cport, struct gb_message *req)
 	int retval;
 	const struct gb_control_connected_request *req_data =
 		(const struct gb_control_connected_request *)req->payload;
+	uint16_t target_cport = sys_le16_to_cpu(req_data->cport_id);
 
 	if (gb_message_payload_len(req) < sizeof(*req_data)) {
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	retval = gb_listen(cport);
+	retval = gb_listen(target_cport);
 	if (retval) {
 		LOG_ERR("Can not connect cport %d: error %d", sys_le16_to_cpu(req_data->cport_id),
 			retval);
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	retval = gb_notify(cport, GB_EVT_CONNECTED);
+	retval = gb_notify(target_cport, GB_EVT_CONNECTED);
 	if (retval) {
 		goto error_notify;
 	}
@@ -109,15 +110,15 @@ error_notify:
 static void gb_control_disconnected(uint16_t cport, struct gb_message *req)
 {
 	int retval;
-	const struct gb_control_connected_request *req_data =
-		(const struct gb_control_connected_request *)req->payload;
+	const struct gb_control_disconnected_request *req_data =
+		(const struct gb_control_disconnected_request *)req->payload;
 
 	if (gb_message_payload_len(req) < sizeof(*req_data)) {
 		LOG_ERR("dropping short message");
 		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
 	}
 
-	retval = gb_notify(cport, GB_EVT_DISCONNECTED);
+	retval = gb_notify(sys_le16_to_cpu(req_data->cport_id), GB_EVT_DISCONNECTED);
 	if (retval) {
 		LOG_ERR("Cannot notify GB driver of disconnect event.");
 		/*
