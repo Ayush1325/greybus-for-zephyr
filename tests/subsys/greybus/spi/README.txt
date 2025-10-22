@@ -1,3 +1,0 @@
-Greybus SPI Subsystem Test
-##########################
-

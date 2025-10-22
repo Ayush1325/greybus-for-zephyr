@@ -1,3 +1,0 @@
-Greybus GPIO Subsystem Test
-###########################
-
