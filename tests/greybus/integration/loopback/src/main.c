@@ -11,33 +11,7 @@
 
 #define REQ_SIZE 256
 
-K_SEM_DEFINE(rx_sem, 0, 1);
-
-static struct gb_message *last_msg;
-
-static int trans_init()
-{
-	return 0;
-}
-
-static int trans_listen(uint16_t cport)
-{
-	return 0;
-}
-
-static int trans_send(uint16_t cport, const struct gb_message *msg)
-{
-	last_msg = gb_message_copy(msg);
-	k_sem_give(&rx_sem);
-
-	return 0;
-}
-
-const struct gb_transport_backend gb_trans_backend = {
-	.init = trans_init,
-	.listen = trans_listen,
-	.send = trans_send,
-};
+struct gb_msg_with_cport gb_transport_get_message(void);
 
 ZTEST_SUITE(greybus_loopback_tests, NULL, NULL, NULL, NULL, NULL);
 
@@ -48,20 +22,24 @@ ZTEST(greybus_loopback_tests, test_cport_count)
 
 ZTEST(greybus_loopback_tests, test_ping)
 {
+	struct gb_msg_with_cport resp;
 	struct gb_message *req = gb_message_request_alloc(0, GB_LOOPBACK_TYPE_PING, false);
 
 	greybus_rx_handler(1, req);
-	k_sem_take(&rx_sem, K_FOREVER);
-	zassert_true(gb_message_is_success(last_msg), "Greybus loopback ping failed");
-	zassert_equal(gb_message_type(last_msg), GB_RESPONSE(GB_LOOPBACK_TYPE_PING),
+	resp = gb_transport_get_message();
+	zassert_true(gb_message_is_success(resp.msg), "Greybus loopback ping failed");
+	zassert_equal(gb_message_type(resp.msg), GB_RESPONSE(GB_LOOPBACK_TYPE_PING),
 		      "Invalid request response");
-	zassert_equal(gb_message_payload_len(last_msg), 0,
+	zassert_equal(gb_message_payload_len(resp.msg), 0,
 		      "Greybus ping request should have empty response");
+
+	gb_message_dealloc(resp.msg);
 }
 
 ZTEST(greybus_loopback_tests, test_sink)
 {
 	size_t i;
+	struct gb_msg_with_cport resp;
 	struct gb_message *req =
 		gb_message_request_alloc(sizeof(struct gb_loopback_transfer_request) + REQ_SIZE,
 					 GB_LOOPBACK_TYPE_SINK, false);
@@ -74,17 +52,20 @@ ZTEST(greybus_loopback_tests, test_sink)
 	}
 
 	greybus_rx_handler(1, req);
-	k_sem_take(&rx_sem, K_FOREVER);
-	zassert_true(gb_message_is_success(last_msg), "Greybus loopback sink failed");
-	zassert_equal(gb_message_type(last_msg), GB_RESPONSE(GB_LOOPBACK_TYPE_SINK),
+	resp = gb_transport_get_message();
+	zassert_true(gb_message_is_success(resp.msg), "Greybus loopback sink failed");
+	zassert_equal(gb_message_type(resp.msg), GB_RESPONSE(GB_LOOPBACK_TYPE_SINK),
 		      "Invalid request response");
-	zassert_equal(gb_message_payload_len(last_msg), 0,
+	zassert_equal(gb_message_payload_len(resp.msg), 0,
 		      "Greybus sink request should have empty response");
+
+	gb_message_dealloc(resp.msg);
 }
 
 ZTEST(greybus_loopback_tests, test_transfer)
 {
 	size_t i;
+	struct gb_msg_with_cport resp;
 	struct gb_message *req_copy;
 	struct gb_message *req =
 		gb_message_request_alloc(sizeof(struct gb_loopback_transfer_request) + REQ_SIZE,
@@ -99,14 +80,15 @@ ZTEST(greybus_loopback_tests, test_transfer)
 
 	req_copy = gb_message_copy(req);
 	greybus_rx_handler(1, req_copy);
-	k_sem_take(&rx_sem, K_FOREVER);
-	zassert_true(gb_message_is_success(last_msg), "Greybus loopback sink failed");
-	zassert_equal(gb_message_type(last_msg), GB_RESPONSE(GB_LOOPBACK_TYPE_TRANSFER),
+	resp = gb_transport_get_message();
+	zassert_true(gb_message_is_success(resp.msg), "Greybus loopback sink failed");
+	zassert_equal(gb_message_type(resp.msg), GB_RESPONSE(GB_LOOPBACK_TYPE_TRANSFER),
 		      "Invalid request response");
-	zassert_equal(gb_message_payload_len(last_msg), gb_message_payload_len(req),
+	zassert_equal(gb_message_payload_len(resp.msg), gb_message_payload_len(req),
 		      "Greybus transfer request should have same size response");
-	zassert_equal(memcmp(req->payload, last_msg->payload, gb_message_payload_len(last_msg)), 0,
+	zassert_equal(memcmp(req->payload, resp.msg->payload, gb_message_payload_len(resp.msg)), 0,
 		      "Response data should be same as request");
 
 	gb_message_dealloc(req);
+	gb_message_dealloc(resp.msg);
 }

@@ -34,6 +34,14 @@
 #include <greybus/greybus_messages.h>
 
 /**
+ * A struct to combine greybus message and cport
+ */
+struct gb_msg_with_cport {
+	uint16_t cport;
+	struct gb_message *msg;
+};
+
+/**
  * Greybus transport backend structure.
  */
 struct gb_transport_backend {
