@@ -39,6 +39,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/led.h>
 #include <greybus/greybus_protocols.h>
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_lights, CONFIG_GREYBUS_LOG_LEVEL);
 

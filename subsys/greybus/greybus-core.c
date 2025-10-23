@@ -37,6 +37,7 @@
 #include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <greybus-utils/manifest.h>
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus, CONFIG_GREYBUS_LOG_LEVEL);
 

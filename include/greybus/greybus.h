@@ -31,16 +31,7 @@
 #ifndef _GREYBUS_H_
 #define _GREYBUS_H_
 
-#include <stddef.h>
-#include <stdbool.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/dlist.h>
 #include <greybus/types.h>
-
-enum gb_event {
-	GB_EVT_CONNECTED,
-	GB_EVT_DISCONNECTED,
-};
 
 struct gb_message;
 
@@ -103,13 +94,5 @@ enum gb_operation_result {
 
 int gb_init(const struct gb_transport_backend *transport);
 void gb_deinit(void);
-
-int gb_listen(uint16_t cport);
-int gb_stop_listening(uint16_t cport);
-int gb_notify(uint16_t cport, enum gb_event event);
-
-int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
-
-uint8_t gb_errno_to_op_result(int err);
 
 #endif /* _GREYBUS_H_ */

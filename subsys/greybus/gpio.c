@@ -39,6 +39,7 @@
 #include "greybus_transport.h"
 #include "greybus_gpio.h"
 #include <greybus/greybus_protocols.h>
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_gpio, CONFIG_GREYBUS_LOG_LEVEL);
 

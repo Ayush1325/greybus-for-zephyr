@@ -34,6 +34,7 @@
 #include "greybus_transport.h"
 #include <zephyr/logging/log.h>
 #include <greybus/greybus_protocols.h>
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_uart, CONFIG_GREYBUS_LOG_LEVEL);
 
