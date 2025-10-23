@@ -40,6 +40,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "greybus_spi.h"
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_spi, CONFIG_GREYBUS_LOG_LEVEL);
 

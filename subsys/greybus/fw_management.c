@@ -12,6 +12,7 @@
 #include <greybus-utils/manifest.h>
 #include <zephyr/logging/log.h>
 #include "greybus_fw_download.h"
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_fw_mgmt, CONFIG_GREYBUS_LOG_LEVEL);
 

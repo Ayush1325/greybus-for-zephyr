@@ -35,41 +35,12 @@
 
 struct gb_message;
 
-struct gb_msg_with_cport {
-	uint16_t cport;
-	struct gb_message *msg;
-};
-
 struct gb_transport_backend {
 	int (*init)(void);
 	void (*exit)(void);
 	int (*listen)(uint16_t cport);
 	int (*stop_listening)(uint16_t cport);
 	int (*send)(uint16_t cport, const struct gb_message *msg);
-};
-
-struct gb_driver;
-
-typedef void (*gb_operation_handler_t)(const void *priv, struct gb_message *msg, uint16_t cport);
-
-struct gb_driver {
-	/*
-	 * This is the callback in which all the initialization of driver-specific
-	 * data should be done. The driver should create struct device and assign
-	 * it to bundle->dev. The driver should store any private data it may need
-	 * in bundle->priv. The same bundle object will be passed to the driver in
-	 * all subsequent greybus handler callbacks calls.
-	 */
-	int (*init)(const void *priv, uint16_t cport);
-	/*
-	 * This function is called upon driver deregistration. All private data
-	 * stored in bundle should be freed and struct device should be closed.
-	 */
-	void (*exit)(const void *priv);
-	void (*connected)(const void *priv);
-	void (*disconnected)(const void *priv);
-
-	gb_operation_handler_t op_handler;
 };
 
 enum gb_operation_type {
