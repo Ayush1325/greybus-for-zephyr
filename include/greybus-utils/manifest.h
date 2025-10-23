@@ -61,7 +61,9 @@
 
 #define GREYBUS_CPORT_COUNT                                                                        \
 	(_GREYBUS_SPECIAL_CPORTS +                                                                 \
-	 DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, (+)))
+	 COND_CODE_0(DT_CHILD_NUM_STATUS_OKAY(_GREYBUS_BASE_NODE), (0),                            \
+		     (DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, _GREYBUS_CPORT_COUNTER, \
+						       (+)))))
 
 #define GREYBUS_FW_MANAGEMENT_CPORT 1
 #define GREYBUS_FW_DOWNLOAD_CPORT   2

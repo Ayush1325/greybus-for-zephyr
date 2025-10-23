@@ -9,11 +9,6 @@
 
 #include <greybus/greybus_messages.h>
 
-struct gb_msg_with_cport {
-	uint16_t cport;
-	struct gb_message *msg;
-};
-
 typedef void (*gb_operation_handler_t)(const void *priv, struct gb_message *msg, uint16_t cport);
 
 struct gb_driver {
