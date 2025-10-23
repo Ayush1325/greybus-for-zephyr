@@ -21,9 +21,9 @@ Add following entry to west.yml file in manifest/projects subtree of Zephyr:
 .. code-block::
 
     - name: greybus
-      revision: upstream-1
+      revision: main
       path: modules/lib/greybus
-      url: https://openbeagle.org/ayush1325/greybus-for-zephyr.git
+      url: https://github.com/Ayush1325/greybus-for-zephyr.git
 
 Then, clone the repository by running
 
