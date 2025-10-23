@@ -4,9 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "greybus_messages.h"
 #include "greybus_transport.h"
-#include <greybus/greybus.h>
 #include <greybus/greybus_protocols.h>
 #include <zephyr/dfu/mcuboot.h>
 #include <greybus-utils/manifest.h>

@@ -28,15 +28,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "greybus_messages.h"
 #include "greybus_transport.h"
-#include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
-#include <greybus/greybus.h>
-#include <stdlib.h>
-#include <string.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "greybus_spi.h"
 #include "greybus_internal.h"

@@ -31,10 +31,7 @@
  */
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/sys/byteorder.h>
 #include "greybus_cport.h"
-#include <greybus/greybus.h>
-#include "greybus_messages.h"
 #include "greybus_transport.h"
 #include <greybus-utils/manifest.h>
 #include "greybus_internal.h"

@@ -28,11 +28,7 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "greybus_messages.h"
 #include "greybus_transport.h"
-#include <sys/time.h>
-#include <greybus/greybus.h>
-#include <zephyr/sys/byteorder.h>
 #include <zephyr/logging/log.h>
 #include <greybus/greybus_protocols.h>
 #include "greybus_internal.h"

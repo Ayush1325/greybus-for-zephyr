@@ -29,15 +29,11 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
-#include <greybus/greybus.h>
 #include <greybus/greybus_protocols.h>
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "greybus_heap.h"
-#include "greybus_messages.h"
 #include "greybus_transport.h"
 #include "greybus_internal.h"
 

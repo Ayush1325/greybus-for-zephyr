@@ -4,12 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <greybus/greybus.h>
 #include <greybus/greybus_protocols.h>
 #include "greybus_transport.h"
-#include <zephyr/logging/log_backend.h>
 #include <greybus-utils/manifest.h>
-#include <zephyr/logging/log_backend_std.h>
 #include "greybus_internal.h"
 
 static void op_handler(const void *priv, struct gb_message *msg, uint16_t cport)

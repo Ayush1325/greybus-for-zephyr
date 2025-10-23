@@ -27,10 +27,6 @@
  */
 
 #include "greybus_uart.h"
-#include <stdint.h>
-#include <string.h>
-#include <greybus/greybus.h>
-#include <zephyr/sys/byteorder.h>
 #include "greybus_transport.h"
 #include <zephyr/logging/log.h>
 #include <greybus/greybus_protocols.h>
