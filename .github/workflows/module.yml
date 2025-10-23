@@ -26,15 +26,7 @@ jobs:
     - name: Build
       run: |
         mkdir dist
-        west twister -T greybus/samples
-        ls -la twister-out/
-        ls -la twister-out/beagleconnect_freedom_cc1352p7/
-        ls -la twister-out/beagleconnect_freedom_cc1352p7/zephyr/
-        ls -la twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/
-        ls -la twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/samples/
-        ls -la twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/samples/basic/
-        ls -la twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/samples/basic/sample.greybus.basic.transport.tcpip/
-        ls -la twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/samples/basic/sample.greybus.basic.transport.tcpip/basic/
+        west twister -T greybus
         mv twister-out/beagleconnect_freedom_cc1352p7/zephyr/greybus/samples/basic/sample.greybus.basic.transport.tcpip/basic/zephyr/zephyr.bin dist/beagleconnect_freedom_subg.bin
         xz -z dist/beagleconnect_freedom_subg.bin
     
