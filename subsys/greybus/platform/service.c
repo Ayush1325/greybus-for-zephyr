@@ -7,7 +7,6 @@
 #include <zephyr/device.h>
 #include <zephyr/init.h>
 #include <greybus/greybus.h>
-#include <greybus/platform.h>
 #include <greybus-utils/manifest.h>
 #include <stddef.h>
 #include <stdint.h>

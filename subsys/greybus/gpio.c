@@ -33,7 +33,6 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/drivers/gpio.h>
 #include <greybus/greybus.h>
-#include <greybus/platform.h>
 #include <zephyr/sys/byteorder.h>
 #include "greybus_messages.h"
 #include "greybus_transport.h"

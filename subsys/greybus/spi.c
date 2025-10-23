@@ -33,7 +33,6 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/spi.h>
 #include <greybus/greybus.h>
-#include <greybus/platform.h>
 #include <stdlib.h>
 #include <string.h>
 #include <zephyr/sys/byteorder.h>

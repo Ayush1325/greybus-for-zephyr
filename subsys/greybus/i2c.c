@@ -32,7 +32,6 @@
 #include <zephyr/device.h>
 #include <zephyr/drivers/i2c.h>
 #include <greybus/greybus.h>
-#include <greybus/platform.h>
 #include <greybus/greybus_protocols.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/kernel.h>
