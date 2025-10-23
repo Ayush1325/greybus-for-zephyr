@@ -45,8 +45,6 @@ int gb_listen(uint16_t cport);
 int gb_stop_listening(uint16_t cport);
 int gb_notify(uint16_t cport, enum gb_event event);
 
-int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
-
 uint8_t gb_errno_to_op_result(int err);
 
 #endif // _GREYBUS_INTERNAL_H_

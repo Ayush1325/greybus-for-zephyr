@@ -35,11 +35,19 @@
 
 struct gb_message;
 
+/**
+ * Greybus transport backend structure.
+ */
 struct gb_transport_backend {
+	/* Initialize transport backend */
 	int (*init)(void);
+	/* De-initialize transport backend */
 	void (*exit)(void);
+	/* Enable cport */
 	int (*listen)(uint16_t cport);
+	/* Disable cport */
 	int (*stop_listening)(uint16_t cport);
+	/* Send greybus message */
 	int (*send)(uint16_t cport, const struct gb_message *msg);
 };
 
@@ -63,7 +71,24 @@ enum gb_operation_result {
 	GB_OP_INTERNAL = 0xff,
 };
 
+/**
+ * Initialize greybus.
+ *
+ * @param transport: greybus transport backend pointer.
+ *
+ * @return 0 in case of success.
+ * @return < 0 in case of error.
+ */
 int gb_init(const struct gb_transport_backend *transport);
+
+/**
+ * De-initialize greybus.
+ */
 void gb_deinit(void);
+
+/**
+ * Submit greybus message for processing.
+ */
+int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
 
 #endif /* _GREYBUS_H_ */
