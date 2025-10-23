@@ -140,6 +140,12 @@ config GREYBUS_XPORT_DUMMY
 	help
 	  This is intended for testing and tracking base greybus subsystem size.
 
+config GREYBUS_XPORT_NONE
+	bool "Use user-defined Transport for Greybus"
+	help
+	  This in intended for providing custom transport backend by downstream
+	  applications or tests.
+
 endchoice
 
 config GREYBUS_AUDIO

@@ -190,6 +190,22 @@ static inline struct gb_message *gb_message_response_alloc_from_req(const void *
 }
 
 /**
+ * Helper to create copy of greybus message.
+ *
+ * @parm msg
+ */
+static inline struct gb_message *gb_message_copy(const struct gb_message *msg)
+{
+	size_t payload_len = gb_message_payload_len(msg);
+	struct gb_message *resp = gb_message_alloc(payload_len, gb_message_type(msg),
+						   msg->header.operation_id, msg->header.result);
+
+	memcpy(resp->payload, msg->payload, payload_len);
+
+	return resp;
+}
+
+/**
  * Helper to get a new unique operation id.
  */
 uint16_t new_operation_id(void);
