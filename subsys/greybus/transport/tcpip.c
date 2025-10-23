@@ -10,7 +10,7 @@
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/socket.h>
 #include "../platform/certificate.h"
-#include "../greybus_messages.h"
+#include <greybus/greybus_messages.h>
 #include "../greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_transport_tcpip, CONFIG_GREYBUS_LOG_LEVEL);

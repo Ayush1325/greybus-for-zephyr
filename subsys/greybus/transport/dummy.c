@@ -5,6 +5,7 @@
  */
 
 #include "../greybus_transport.h"
+#include <greybus/greybus.h>
 
 static int init()
 {

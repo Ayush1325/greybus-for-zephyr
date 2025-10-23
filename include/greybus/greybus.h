@@ -31,9 +31,7 @@
 #ifndef _GREYBUS_H_
 #define _GREYBUS_H_
 
-#include <greybus/types.h>
-
-struct gb_message;
+#include <greybus/greybus_messages.h>
 
 /**
  * Greybus transport backend structure.
@@ -49,26 +47,6 @@ struct gb_transport_backend {
 	int (*stop_listening)(uint16_t cport);
 	/* Send greybus message */
 	int (*send)(uint16_t cport, const struct gb_message *msg);
-};
-
-enum gb_operation_type {
-	GB_TYPE_RESPONSE_FLAG = 0x80,
-};
-
-#define GB_RESPONSE(req) (req | GB_TYPE_RESPONSE_FLAG)
-
-enum gb_operation_result {
-	GB_OP_SUCCESS = 0x00,
-	GB_OP_INTERRUPTED = 0x01,
-	GB_OP_TIMEOUT = 0x02,
-	GB_OP_NO_MEMORY = 0x03,
-	GB_OP_PROTOCOL_BAD = 0x04,
-	GB_OP_OVERFLOW = 0x05,
-	GB_OP_INVALID = 0x06,
-	GB_OP_RETRY = 0x07,
-	GB_OP_NONEXISTENT = 0x08,
-	GB_OP_UNKNOWN_ERROR = 0xfe,
-	GB_OP_INTERNAL = 0xff,
 };
 
 /**

@@ -7,7 +7,7 @@
 #ifndef _GREYBUS_INTERNAL_H_
 #define _GREYBUS_INTERNAL_H_
 
-#include "greybus_messages.h"
+#include <greybus/greybus_messages.h>
 
 struct gb_msg_with_cport {
 	uint16_t cport;
