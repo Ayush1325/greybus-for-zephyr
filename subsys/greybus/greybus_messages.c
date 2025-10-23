@@ -3,7 +3,7 @@
  * Copyright (c) 2023-25 Ayush Singh <ayushdevel1325@gmail.com>
  */
 
-#include "greybus_messages.h"
+#include <greybus/greybus_messages.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include "greybus_heap.h"

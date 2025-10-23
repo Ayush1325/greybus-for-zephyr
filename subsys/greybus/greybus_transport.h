@@ -7,7 +7,7 @@
 #ifndef _GREYBUS_TRANSPORT_H_
 #define _GREYBUS_TRANSPORT_H_
 
-#include "greybus_messages.h"
+#include <greybus/greybus_messages.h>
 
 extern const struct gb_transport_backend gb_trans_backend;
 

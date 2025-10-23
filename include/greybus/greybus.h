@@ -31,85 +31,42 @@
 #ifndef _GREYBUS_H_
 #define _GREYBUS_H_
 
-#include <stddef.h>
-#include <stdbool.h>
-#include <zephyr/sys/atomic.h>
-#include <zephyr/sys/dlist.h>
-#include <greybus/types.h>
+#include <greybus/greybus_messages.h>
 
-enum gb_event {
-	GB_EVT_CONNECTED,
-	GB_EVT_DISCONNECTED,
-};
-
-struct gb_message;
-
-struct gb_msg_with_cport {
-	uint16_t cport;
-	struct gb_message *msg;
-};
-
+/**
+ * Greybus transport backend structure.
+ */
 struct gb_transport_backend {
+	/* Initialize transport backend */
 	int (*init)(void);
+	/* De-initialize transport backend */
 	void (*exit)(void);
+	/* Enable cport */
 	int (*listen)(uint16_t cport);
+	/* Disable cport */
 	int (*stop_listening)(uint16_t cport);
+	/* Send greybus message */
 	int (*send)(uint16_t cport, const struct gb_message *msg);
 };
 
-struct gb_driver;
-
-typedef void (*gb_operation_handler_t)(const void *priv, struct gb_message *msg, uint16_t cport);
-
-struct gb_driver {
-	/*
-	 * This is the callback in which all the initialization of driver-specific
-	 * data should be done. The driver should create struct device and assign
-	 * it to bundle->dev. The driver should store any private data it may need
-	 * in bundle->priv. The same bundle object will be passed to the driver in
-	 * all subsequent greybus handler callbacks calls.
-	 */
-	int (*init)(const void *priv, uint16_t cport);
-	/*
-	 * This function is called upon driver deregistration. All private data
-	 * stored in bundle should be freed and struct device should be closed.
-	 */
-	void (*exit)(const void *priv);
-	void (*connected)(const void *priv);
-	void (*disconnected)(const void *priv);
-
-	gb_operation_handler_t op_handler;
-};
-
-enum gb_operation_type {
-	GB_TYPE_RESPONSE_FLAG = 0x80,
-};
-
-#define GB_RESPONSE(req) (req | GB_TYPE_RESPONSE_FLAG)
-
-enum gb_operation_result {
-	GB_OP_SUCCESS = 0x00,
-	GB_OP_INTERRUPTED = 0x01,
-	GB_OP_TIMEOUT = 0x02,
-	GB_OP_NO_MEMORY = 0x03,
-	GB_OP_PROTOCOL_BAD = 0x04,
-	GB_OP_OVERFLOW = 0x05,
-	GB_OP_INVALID = 0x06,
-	GB_OP_RETRY = 0x07,
-	GB_OP_NONEXISTENT = 0x08,
-	GB_OP_UNKNOWN_ERROR = 0xfe,
-	GB_OP_INTERNAL = 0xff,
-};
-
+/**
+ * Initialize greybus.
+ *
+ * @param transport: greybus transport backend pointer.
+ *
+ * @return 0 in case of success.
+ * @return < 0 in case of error.
+ */
 int gb_init(const struct gb_transport_backend *transport);
+
+/**
+ * De-initialize greybus.
+ */
 void gb_deinit(void);
 
-int gb_listen(uint16_t cport);
-int gb_stop_listening(uint16_t cport);
-int gb_notify(uint16_t cport, enum gb_event event);
-
+/**
+ * Submit greybus message for processing.
+ */
 int greybus_rx_handler(uint16_t cport, struct gb_message *msg);
-
-uint8_t gb_errno_to_op_result(int err);
 
 #endif /* _GREYBUS_H_ */

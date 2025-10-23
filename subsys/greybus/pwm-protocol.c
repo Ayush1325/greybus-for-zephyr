@@ -28,15 +28,12 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "greybus_messages.h"
 #include "greybus_transport.h"
-#include <stdbool.h>
-#include <greybus/greybus.h>
-#include <zephyr/sys/byteorder.h>
 #include "greybus_pwm.h"
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/logging/log.h>
 #include <greybus/greybus_protocols.h>
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_pwm, CONFIG_GREYBUS_LOG_LEVEL);
 

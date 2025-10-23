@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include "greybus_messages.h"
 #include "greybus_transport.h"
-#include <greybus/greybus.h>
 #include <greybus/greybus_protocols.h>
 #include <zephyr/dfu/flash_img.h>
 #include <zephyr/dfu/mcuboot.h>
 #include "greybus_fw_mgmt.h"
 #include <greybus-utils/manifest.h>
 #include <zephyr/logging/log.h>
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_fw_download, CONFIG_GREYBUS_LOG_LEVEL);
 

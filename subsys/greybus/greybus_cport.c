@@ -16,6 +16,7 @@
 #include "greybus_fw_download.h"
 #include "greybus_fw_mgmt.h"
 #include "greybus_log.h"
+#include "greybus_internal.h"
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
