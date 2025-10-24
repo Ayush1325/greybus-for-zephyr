@@ -40,19 +40,14 @@
 
 LOG_MODULE_REGISTER(greybus_gpio, CONFIG_GREYBUS_LOG_LEVEL);
 
-static void gb_gpio_line_count(uint16_t cport, struct gb_message *req, const struct device *dev)
+static void gb_gpio_line_count(uint16_t cport, struct gb_message *req,
+			       const struct gb_gpio_driver_data *data)
 {
-	struct gb_gpio_line_count_response resp_data;
-	uint8_t count;
-	const struct gpio_driver_config *cfg = (const struct gpio_driver_config *)dev->config;
-	__ASSERT_NO_MSG(cfg != NULL);
+	const struct gb_gpio_line_count_response resp_data = {
+		/* Need to return 1 less than number of GPIOs */
+		.count = data->ngpios - 1,
+	};
 
-	count = POPCOUNT(cfg->port_pin_mask);
-	if (!count) {
-		return gb_transport_message_empty_response_send(req, GB_OP_UNKNOWN_ERROR, cport);
-	}
-
-	resp_data.count = count;
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
 }
 
@@ -270,7 +265,7 @@ static void gb_gpio_handler(const void *priv, struct gb_message *msg, uint16_t c
 
 	switch (gb_message_type(msg)) {
 	case GB_GPIO_TYPE_LINE_COUNT:
-		return gb_gpio_line_count(cport, msg, data->dev);
+		return gb_gpio_line_count(cport, msg, data);
 	case GB_GPIO_TYPE_ACTIVATE:
 		return gb_gpio_activate(cport, msg, data->dev);
 	case GB_GPIO_TYPE_DEACTIVATE:
