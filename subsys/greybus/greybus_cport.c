@@ -37,6 +37,7 @@ enum {
 #define GB_GPIO_PRIV_DATA(_node_id, _prop, _idx)                                                   \
 	static struct gb_gpio_driver_data gb_gpio_priv_data_##_idx = {                             \
 		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
+		.ngpios = DT_PROP(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx), ngpios),               \
 	};
 
 #define GB_PWM_PRIV_DATA(_node_id, _prop, _idx)                                                    \

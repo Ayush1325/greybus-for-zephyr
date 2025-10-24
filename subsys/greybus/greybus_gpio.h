@@ -15,6 +15,7 @@ struct gb_gpio_driver_data {
 	struct gpio_callback cb;
 	const struct device *const dev;
 	uint16_t cport;
+	uint8_t ngpios;
 };
 
 #endif // _GREYBUS_GPIO_H_
