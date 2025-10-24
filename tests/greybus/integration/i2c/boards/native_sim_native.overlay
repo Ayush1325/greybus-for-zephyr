@@ -1,0 +1,15 @@
+/*
+ * Copyright (c) 2025 Ayush Singh, BeagleBoard.org
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	zephyr,greybus {
+		gbbundle1 {
+			status = "okay";
+			compatible = "zephyr,greybus-bundle-bridged-phy";
+			i2c-controllers = <&i2c0>;
+		};
+	};
+};
