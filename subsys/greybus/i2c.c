@@ -33,7 +33,6 @@
 #include <greybus/greybus_protocols.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/logging/log.h>
-#include "greybus_heap.h"
 #include "greybus_transport.h"
 #include "greybus_internal.h"
 
@@ -42,12 +41,12 @@ LOG_MODULE_REGISTER(greybus_i2c, CONFIG_GREYBUS_LOG_LEVEL);
 static void gb_i2c_protocol_functionality(uint16_t cport, struct gb_message *req)
 {
 	const struct gb_i2c_functionality_response resp_data = {
-		.functionality = sys_cpu_to_le32(
+		.functionality =
 			GB_I2C_FUNC_I2C | GB_I2C_FUNC_SMBUS_READ_BYTE |
 			GB_I2C_FUNC_SMBUS_WRITE_BYTE | GB_I2C_FUNC_SMBUS_READ_BYTE_DATA |
 			GB_I2C_FUNC_SMBUS_WRITE_BYTE_DATA | GB_I2C_FUNC_SMBUS_READ_WORD_DATA |
 			GB_I2C_FUNC_SMBUS_WRITE_WORD_DATA | GB_I2C_FUNC_SMBUS_READ_I2C_BLOCK |
-			GB_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK),
+			GB_I2C_FUNC_SMBUS_WRITE_I2C_BLOCK,
 	};
 
 	gb_transport_message_response_success_send(req, &resp_data, sizeof(resp_data), cport);
@@ -56,91 +55,63 @@ static void gb_i2c_protocol_functionality(uint16_t cport, struct gb_message *req
 static void gb_i2c_protocol_transfer(uint16_t cport, struct gb_message *req,
 				     const struct device *dev)
 {
-	int i, op_count;
-	uint32_t size = 0;
-	int ret;
-	uint8_t *write_data;
-	bool read_op;
-	int read_count = 0;
-	struct i2c_msg *requests;
-
 	const struct gb_i2c_transfer_op *desc;
-	const struct gb_i2c_transfer_request *request =
+	const uint8_t *write_data;
+	uint8_t *read_data;
+	const struct gb_i2c_transfer_request *req_data =
 		(const struct gb_i2c_transfer_request *)req->payload;
 	struct gb_message *resp;
-	struct gb_i2c_transfer_response *resp_data;
-	uint16_t addr = -1;
+	size_t i, resp_size = 0;
+	uint16_t op_size, addr, op_count;
+	int ret;
 
-	if (gb_message_payload_len(req) < sizeof(*request)) {
-		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
-	}
-
-	op_count = sys_le16_to_cpu(request->op_count);
-	write_data = (uint8_t *)&request->ops[op_count];
-
-	if (gb_message_payload_len(req) < sizeof(*request) + op_count * sizeof(request->ops[0])) {
-		return gb_transport_message_empty_response_send(req, GB_OP_INVALID, cport);
-	}
+	op_count = sys_le16_to_cpu(req_data->op_count);
+	write_data = (const uint8_t *)&req_data->ops[op_count];
 
 	for (i = 0; i < op_count; i++) {
-		desc = &request->ops[i];
-		read_op = (sys_le16_to_cpu(desc->flags) & GB_I2C_M_RD) ? true : false;
-
-		if (read_op) {
-			size += sys_le16_to_cpu(desc->size);
+		desc = &req_data->ops[i];
+		if (desc->flags & GB_I2C_M_RD) {
+			resp_size += sys_le16_to_cpu(desc->size);
 		}
 	}
 
-	resp = gb_message_alloc(size, GB_RESPONSE(req->header.type), req->header.operation_id,
+	resp = gb_message_alloc(resp_size, GB_RESPONSE(req->header.type), req->header.operation_id,
 				GB_OP_SUCCESS);
 	if (!resp) {
+		LOG_ERR("Failed to allocate response");
 		return gb_transport_message_empty_response_send(req, GB_OP_NO_MEMORY, cport);
 	}
-	resp_data = (struct gb_i2c_transfer_response *)resp->payload;
-
-	requests = gb_alloc(sizeof(*requests) * op_count);
-	if (!requests) {
-		ret = GB_OP_NO_MEMORY;
-		goto free_msg;
-	}
-
-	if (op_count > 0) {
-		addr = sys_le16_to_cpu(request->ops[0].addr);
-	}
+	read_data = resp->payload;
 
 	for (i = 0; i < op_count; i++) {
-		desc = &request->ops[i];
-		read_op = (sys_le16_to_cpu(desc->flags) & GB_I2C_M_RD) ? true : false;
+		desc = &req_data->ops[i];
+		op_size = sys_le16_to_cpu(desc->size);
+		addr = sys_le16_to_cpu(desc->addr);
 
-		if (sys_le16_to_cpu(desc->addr) != addr) {
-			/* Zephyr only allows a single address to be used */
-			ret = -EINVAL;
-			goto free_requests;
-		}
-
-		requests[i].flags = 0;
-		requests[i].len = sys_le16_to_cpu(desc->size);
-
-		if (read_op) {
-			requests[i].flags |= I2C_MSG_READ;
-			requests[i].buf = &resp_data->data[read_count];
-			read_count += sys_le16_to_cpu(desc->size);
+		if (desc->flags & GB_I2C_M_RD) {
+			ret = i2c_read(dev, read_data, op_size, desc->addr);
+			if (ret < 0) {
+				LOG_ERR("Failed to read i2c data");
+				ret = gb_errno_to_op_result(ret);
+				goto free_msg;
+			}
+			read_data += op_size;
 		} else {
-			requests[i].buf = write_data;
-			write_data += sys_le16_to_cpu(desc->size);
+			ret = i2c_write(dev, write_data, op_size, desc->addr);
+			if (ret < 0) {
+				LOG_ERR("Failed to write i2c data");
+				ret = gb_errno_to_op_result(ret);
+				goto free_msg;
+			}
+			write_data += op_size;
 		}
 	}
-
-	ret = i2c_transfer(dev, requests, op_count, addr);
 
 	gb_transport_message_send(resp, cport);
 	return gb_message_dealloc(resp);
 
 free_msg:
 	gb_message_dealloc(resp);
-free_requests:
-	gb_free(requests);
-
 	return gb_transport_message_empty_response_send(req, ret, cport);
 }
 
