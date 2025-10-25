@@ -58,7 +58,7 @@ using Greybus. Currently, this module supports the protocols below.
 
 * `GPIO <doc/gpio.rst>`_
 * `I2C <doc/i2c.rst>`_
-* `SPI <doc/spi.rst>`_
+* SPI (Only 1 chipselect and only generic SPI bit-bang device)
 
 Additional Information
 **********************
