@@ -61,10 +61,25 @@ using Greybus. Currently, this module supports the protocols below.
 * SPI (Only 1 chipselect and only generic SPI bit-bang device)
 
 Additional Information
-**********************
-
-Additional Information about Greybus including videos, slide presentations,
-and deprecated demo instructions can be found `here <doc/old.md>`_.
+#######################
 
 A compiled version of the `Greybus Specification <https://github.com/projectara/greybus-spec>`_
 is available `here <doc/GreybusSpecification.pdf>`_.
+
+Other Media
+************
+
+- Greg Kroah-Hartman, Project Ara DC 2015: https://www.youtube.com/watch?v=UzRq8jAHAxU
+- Alexandre Baillon, ELCE 2016
+        - Slides: https://elinux.org/images/c/cb/Using_Greybus_for_IoT.pdf
+        - Video: https://www.youtube.com/watch?v=7H50pv-4YXw
+- Alexandre Baillon, LPC 2019
+        - Slides: https://linuxplumbersconf.org/event/4/contributions/375/attachments/335/561/greybus_for_iot.pdf
+        - Video: https://www.youtube.com/watch?v=bVQ_mpvTCIM
+- Jason Kridner, LPC 2019
+        - Slides: https://linuxplumbersconf.org/event/4/contributions/437/attachments/341/568/beagledust.pdf
+        - Video: https://www.youtube.com/watch?v=bVQ_mpvTCIM&t=9393
+- Christopher Friedt, LPC 2020 
+        - Materials: https://linuxplumbersconf.org/event/7/contributions/814/
+        - Video: https://youtu.be/n4yiCF2wYeo?t=11683
+- Zephyr Project: Using Linux, Zephyr, & Greybus for IoT (October 15, 2020): https://www.zephyrproject.org/using-linux-zephyr-greybus-for-iot/ 
