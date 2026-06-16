@@ -275,13 +275,24 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 			      const struct gb_camera_driver_data *data)
 {
 	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
-	struct video_buffer *vbuf;
+	struct gb_camera_capture_request *req;
+	size_t payload_size;
+	uint16_t num_frames;
 	int ret;
 
 	if (drv_data == NULL || drv_data->info.state < STATE_CONFIGURED) {
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
 	}
+
+	payload_size = gb_hdr_message_len(&msg->header) - sizeof(struct gb_operation_msg_hdr);
+	if (payload_size != sizeof(*req)) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+
+	req = (struct gb_camera_capture_request *)msg->payload;
+	num_frames = sys_le16_to_cpu(req->num_frames);
 
 	if (drv_data->info.state != STATE_STREAMING) {
 		ret = video_stream_start(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
@@ -292,18 +303,10 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 		drv_data->info.state = STATE_STREAMING;
 	}
 
-	ret = video_dequeue(drv_data->dev, &vbuf, K_MSEC(1000)); // Removed VIDEO_EP_OUT
-	if (ret) {
-		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
-		return;
-	}
-
-	/*TODO- Dynamically allocate gb response msg, copy vbuf->buffer
-	 *(size:vbuf->bytesused) into it send it back to the host */
-
-	video_enqueue(drv_data->dev, vbuf);
-
-	/*stub: sending empty success until the payload packing is done */
+	/* TODO for Data CPort Architecture PR:
+	 * an asynchronous worker thread here to pull `num_frames`
+	 * from `video_dequeue()` and push them over the Data CPort
+	 */
 	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
@@ -317,19 +320,43 @@ static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
 			    const struct gb_camera_driver_data *data)
 {
 	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+	struct gb_camera_flush_response *resp;
+	int ret;
 
 	if (drv_data == NULL || drv_data->info.state < STATE_STREAMING) {
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
 	}
 
-	video_stream_stop(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
+	ret = video_stream_stop(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
+	if (ret) {
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
 
-	video_flush(drv_data->dev, true);
+	ret = video_flush(drv_data->dev, true);
+	if (ret) {
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
 
 	drv_data->info.state = STATE_CONFIGURED;
 
-	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+	resp = gb_alloc(sizeof(*resp));
+	if (!resp) {
+		gb_transport_message_empty_response_send(msg, GB_OP_NO_MEMORY, cport);
+		return;
+	}
+	memset(resp, 0, sizeof(*resp));
+
+	/* TODO for Data CPort Architecture:
+	 * this request_id must be updated to track the ID of the last successfully
+	 * flushed capture request once the asynchronous data queue (mentioned before) is
+	 * implemented. Hardcoded to 0 for the MVP */
+	resp->request_id = sys_cpu_to_le32(0);
+
+	gb_transport_message_response_success_send(msg, resp, sizeof(*resp), cport);
+	gb_free(resp);
 }
 
 /**
