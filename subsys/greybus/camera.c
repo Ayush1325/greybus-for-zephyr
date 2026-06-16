@@ -161,33 +161,108 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
  * @param msg- incoming gb message request
  * @param data- pointer to camera driver data
  */
-static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
+static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg,
+					const struct gb_camera_driver_data *data)
 {
-    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
-    struct video_format fmt;
-    int ret;
+	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+	struct video_format hw_fmt;
+	struct gb_camera_configure_streams_request *req;
+	struct gb_camera_configure_streams_response *resp;
+	struct gb_camera_stream_config_request *stream_req;
+	struct gb_camera_stream_config_response *stream_resp;
+	size_t expected_req_size, resp_size, payload_size;
+	uint64_t max_size;
+	uint16_t req_width, req_height, req_format;
+	int ret, i;
+	uint8_t resp_flags = 0;
 
-    if (drv_data == NULL || drv_data->info.state < STATE_UNCONFIGURED) {
-        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-        return;
-    }
+	if (drv_data == NULL || drv_data->info.state < STATE_UNCONFIGURED) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
 
-    /*TODO- Parse the requested resolution from the incoming msg payload */
-    /*for now, we are hardcoding to a format that we know the driver supports */
-    fmt.pixelformat = VIDEO_PIX_FMT_JPEG;
-    fmt.width = 640;
-    fmt.height = 480;
-    fmt.pitch = 640 * 2; 
+	payload_size = gb_hdr_message_len(&msg->header) - sizeof(struct gb_operation_msg_hdr);
 
-    ret = video_set_format(drv_data->dev, &fmt);
-    if (ret) {
-        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
-        return;
-    }
+	if (payload_size < sizeof(*req)) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
 
-    drv_data->info.state = STATE_CONFIGURED;
+	req = (struct gb_camera_configure_streams_request *)msg->payload;
 
-    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+	if (req->num_streams == 0 || req->num_streams > GB_CAMERA_MAX_STREAMS) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+
+	expected_req_size = sizeof(*req) + (req->num_streams * sizeof(*stream_req));
+	if (payload_size != expected_req_size) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+	resp_size = sizeof(*resp) + (req->num_streams * sizeof(*stream_resp));
+	resp = gb_alloc(resp_size);
+	if (!resp) {
+		gb_transport_message_empty_response_send(msg, GB_OP_NO_MEMORY, cport);
+		return;
+	}
+	memset(resp, 0, resp_size);
+
+	for (i = 0; i < req->num_streams; i++) {
+		stream_req = &req->config[i];
+		stream_resp = &resp->config[i];
+
+		req_width = sys_le16_to_cpu(stream_req->width);
+		req_height = sys_le16_to_cpu(stream_req->height);
+		req_format = sys_le16_to_cpu(stream_req->format);
+
+		if (req_width == 0 || req_height == 0) {
+			gb_free(resp);
+			gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+			return;
+		}
+
+		if (req_format != GB_CAMERA_CAP_FMT_JPEG) {
+			resp_flags |= GB_CAMERA_CONFIGURE_STREAMS_ADJUSTED;
+			req_format = GB_CAMERA_CAP_FMT_JPEG;
+		}
+
+		if (i == 0) {
+			hw_fmt.pixelformat = VIDEO_PIX_FMT_JPEG;
+			hw_fmt.width = req_width;
+			hw_fmt.height = req_height;
+			hw_fmt.pitch = 0;
+		} else {
+			resp_flags |= GB_CAMERA_CONFIGURE_STREAMS_ADJUSTED;
+		}
+
+		stream_resp->width = sys_cpu_to_le16(req_width);
+		stream_resp->height = sys_cpu_to_le16(req_height);
+		stream_resp->format = sys_cpu_to_le16(req_format);
+
+		max_size = (uint64_t)req_width * req_height * 2;
+
+		if (max_size > UINT32_MAX) {
+			max_size = UINT32_MAX;
+		}
+
+		stream_resp->max_size = sys_cpu_to_le32((uint32_t)max_size);
+	}
+
+	ret = video_set_format(drv_data->dev, &hw_fmt);
+	if (ret) {
+		gb_free(resp);
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
+
+	resp->num_streams = req->num_streams;
+	resp->flags = resp_flags;
+
+	drv_data->info.state = STATE_CONFIGURED;
+
+	gb_transport_message_response_success_send(msg, resp, resp_size, cport);
+	gb_free(resp);
 }
 
 /**
@@ -196,39 +271,40 @@ static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg, 
  * @param msg- incoming gb message request
  * @param data- pointer to camera driver data
  */
-static void gb_camera_capture(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
+static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
+			      const struct gb_camera_driver_data *data)
 {
-    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
-    struct video_buffer *vbuf;
-    int ret;
+	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+	struct video_buffer *vbuf;
+	int ret;
 
-    if (drv_data == NULL || drv_data->info.state < STATE_CONFIGURED) {
-        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-        return;
-    }
+	if (drv_data == NULL || drv_data->info.state < STATE_CONFIGURED) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
 
-    if (drv_data->info.state != STATE_STREAMING) {
-        ret = video_stream_start(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
-        if (ret) {
-            gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
-            return;
-        }
-        drv_data->info.state = STATE_STREAMING;
-    }
+	if (drv_data->info.state != STATE_STREAMING) {
+		ret = video_stream_start(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
+		if (ret) {
+			gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+			return;
+		}
+		drv_data->info.state = STATE_STREAMING;
+	}
 
-    ret = video_dequeue(drv_data->dev, &vbuf, K_MSEC(1000)); // Removed VIDEO_EP_OUT
-    if (ret) {
-        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
-        return;
-    }
+	ret = video_dequeue(drv_data->dev, &vbuf, K_MSEC(1000)); // Removed VIDEO_EP_OUT
+	if (ret) {
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
 
-    /*TODO- Dynamically allocate gb response msg, copy vbuf->buffer 
-     *(size:vbuf->bytesused) into it send it back to the host */
+	/*TODO- Dynamically allocate gb response msg, copy vbuf->buffer
+	 *(size:vbuf->bytesused) into it send it back to the host */
 
-    video_enqueue(drv_data->dev, vbuf);
-  
-    /*stub: sending empty success until the payload packing is done */
-    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+	video_enqueue(drv_data->dev, vbuf);
+
+	/*stub: sending empty success until the payload packing is done */
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 /**
@@ -237,22 +313,23 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg, const stru
  * @param msg- incoming gb message request
  * @param data- Pointer to camera driver data
  */
-static void gb_camera_flush(uint16_t cport, struct gb_message *msg, const struct gb_camera_driver_data *data)
+static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
+			    const struct gb_camera_driver_data *data)
 {
-    struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
+	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
 
-    if (drv_data == NULL || drv_data->info.state < STATE_STREAMING) {
-        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-        return;
-    }
+	if (drv_data == NULL || drv_data->info.state < STATE_STREAMING) {
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
 
-    video_stream_stop(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT); 
+	video_stream_stop(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
 
-    video_flush(drv_data->dev, true);
+	video_flush(drv_data->dev, true);
 
-    drv_data->info.state = STATE_CONFIGURED;
+	drv_data->info.state = STATE_CONFIGURED;
 
-    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 /**
@@ -312,15 +389,15 @@ static void gb_camera_handler(const void *priv, struct gb_message *msg, uint16_t
 	case GB_CAMERA_TYPE_CAPABILITIES:
 		gb_camera_capabilities(cport, msg, data);
 		break;
-  case GB_CAMERA_TYPE_CONFIGURE_STREAMS:
-    gb_camera_configure_streams(cport, msg, data);
-    break;
-   case GB_CAMERA_TYPE_CAPTURE:
-     gb_camera_capture(cport, msg, data);
-        break;
-    case GB_CAMERA_TYPE_FLUSH:
-        gb_camera_flush(cport, msg, data);
-        break;
+	case GB_CAMERA_TYPE_CONFIGURE_STREAMS:
+		gb_camera_configure_streams(cport, msg, data);
+		break;
+	case GB_CAMERA_TYPE_CAPTURE:
+		gb_camera_capture(cport, msg, data);
+		break;
+	case GB_CAMERA_TYPE_FLUSH:
+		gb_camera_flush(cport, msg, data);
+		break;
 	default:
 		LOG_ERR("Invalid type: %d", gb_message_type(msg));
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
