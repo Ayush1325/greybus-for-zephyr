@@ -176,7 +176,7 @@ static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg,
 	int ret, i;
 	uint8_t resp_flags = 0;
 
-	if (drv_data == NULL || drv_data->info.state < STATE_UNCONFIGURED) {
+	if (drv_data == NULL || drv_data->info.state == STATE_STREAMING) {
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
 	}
@@ -228,6 +228,7 @@ static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg,
 		}
 
 		if (i == 0) {
+			hw_fmt.type = VIDEO_BUF_TYPE_OUTPUT;
 			hw_fmt.pixelformat = VIDEO_PIX_FMT_JPEG;
 			hw_fmt.width = req_width;
 			hw_fmt.height = req_height;
