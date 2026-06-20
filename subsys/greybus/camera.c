@@ -279,7 +279,7 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
 	struct gb_camera_capture_request *req;
 	size_t payload_size;
-	uint16_t num_frames;
+	//	uint16_t num_frames;
 	int ret;
 
 	if (drv_data == NULL || drv_data->info.state < STATE_CONFIGURED) {
@@ -294,11 +294,17 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 	}
 
 	req = (struct gb_camera_capture_request *)msg->payload;
-	num_frames = sys_le16_to_cpu(req->num_frames);
+	//	num_frames = sys_le16_to_cpu(req->num_frames);
+	ret = gb_camera_data_start_stream(&drv_data->data_ctx);
+	if (ret != 0 && ret != -EALREADY) {
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
 
 	if (drv_data->info.state != STATE_STREAMING) {
 		ret = video_stream_start(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
 		if (ret) {
+			gb_camera_data_stop_stream(&drv_data->data_ctx);
 			gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
 			return;
 		}
@@ -329,7 +335,7 @@ static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
 	}
-
+	gb_camera_data_stop_stream(&drv_data->data_ctx); // data-plane-architecture fix
 	ret = video_stream_stop(drv_data->dev, VIDEO_BUF_TYPE_OUTPUT);
 	if (ret) {
 		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
@@ -378,6 +384,10 @@ static void gb_camera_connected(const void *priv, uint16_t cport)
 	}
 
 	data->info.state = STATE_UNCONFIGURED;
+	int ret = gb_camera_data_init(&data->data_ctx, data->dev, cport);
+	if (ret != 0) {
+		LOG_ERR("Failed to initialize Camera Data Plane!");
+	}
 }
 
 /**

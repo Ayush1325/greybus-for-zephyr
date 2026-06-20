@@ -9,6 +9,7 @@
 
 #include <zephyr/toolchain.h>
 #include <stdint.h>
+#include "camera_data.h"
 
 #define GB_CAMERA_CAP_FMT_JPEG           0x01
 
@@ -21,6 +22,7 @@ struct gb_camera_info {
 struct gb_camera_driver_data {
 	const struct device *dev;
 	struct gb_camera_info info;
+  struct gb_camera_data_ctx data_ctx;
 };
 
 #endif /* __GREYBUS_CAMERA_H__ */
