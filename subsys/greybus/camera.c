@@ -65,7 +65,7 @@ LOG_MODULE_REGISTER(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
  */
 static void gb_camera_protocol_version(uint16_t cport, struct gb_message *msg)
 {
-	struct gb_camera_version_response response = {
+	const struct gb_camera_version_response response = {
 		.major = GB_CAMERA_VERSION_MAJOR,
 		.minor = GB_CAMERA_VERSION_MINOR,
 	};
@@ -91,11 +91,10 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
 				   const struct gb_camera_driver_data *data)
 {
 	struct gb_camera_capabilities_response *response;
-	struct video_caps vcaps = {0};
+	struct video_caps vcaps;
 	struct gb_camera_csi_params *csi_header;
 	struct gb_camera_format_desc *format;
-	size_t payload_size;
-	size_t total_size;
+	size_t payload_size, total_size;
 	uint8_t num_formats = 0;
 	int ret, i;
 
@@ -104,6 +103,7 @@ static void gb_camera_capabilities(uint16_t cport, struct gb_message *msg,
 		return;
 	}
 
+	vcaps.type = VIDEO_BUF_TYPE_OUTPUT;
 	ret = video_get_caps(data->dev, &vcaps);
 	if (ret) {
 		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
@@ -181,15 +181,13 @@ static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg,
 		return;
 	}
 
-	payload_size = gb_hdr_message_len(&msg->header) - sizeof(struct gb_operation_msg_hdr);
-
+	payload_size = gb_message_payload_len(msg);
 	if (payload_size < sizeof(*req)) {
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
 	}
 
 	req = (struct gb_camera_configure_streams_request *)msg->payload;
-
 	if (req->num_streams == 0 || req->num_streams > GB_CAMERA_MAX_STREAMS) {
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
@@ -217,9 +215,7 @@ static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg,
 		req_format = sys_le16_to_cpu(stream_req->format);
 
 		if (req_width == 0 || req_height == 0) {
-			gb_free(resp);
-			gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-			return;
+			goto err_invalid_stream;
 		}
 
 		if (req_format != GB_CAMERA_CAP_FMT_JPEG) {
@@ -264,6 +260,11 @@ static void gb_camera_configure_streams(uint16_t cport, struct gb_message *msg,
 
 	gb_transport_message_response_success_send(msg, resp, resp_size, cport);
 	gb_free(resp);
+	return;
+
+err_invalid_stream:
+	gb_free(resp);
+	gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 }
 
 /**
@@ -286,7 +287,7 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 		return;
 	}
 
-	payload_size = gb_hdr_message_len(&msg->header) - sizeof(struct gb_operation_msg_hdr);
+	payload_size = gb_message_payload_len(msg);
 	if (payload_size != sizeof(*req)) {
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
@@ -321,7 +322,7 @@ static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
 			    const struct gb_camera_driver_data *data)
 {
 	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
-	struct gb_camera_flush_response *resp;
+	struct gb_camera_flush_response resp;
 	int ret;
 
 	if (drv_data == NULL || drv_data->info.state < STATE_STREAMING) {
@@ -343,25 +344,19 @@ static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
 
 	drv_data->info.state = STATE_CONFIGURED;
 
-	resp = gb_alloc(sizeof(*resp));
-	if (!resp) {
-		gb_transport_message_empty_response_send(msg, GB_OP_NO_MEMORY, cport);
-		return;
-	}
-	memset(resp, 0, sizeof(*resp));
+	memset(&resp, 0, sizeof(resp));
 
 	/* TODO for Data CPort Architecture:
 	 * this request_id must be updated to track the ID of the last successfully
 	 * flushed capture request once the asynchronous data queue (mentioned before) is
 	 * implemented. Hardcoded to 0 for the MVP */
-	resp->request_id = sys_cpu_to_le32(0);
+	resp.request_id = sys_cpu_to_le32(0);
 
-	gb_transport_message_response_success_send(msg, resp, sizeof(*resp), cport);
-	gb_free(resp);
+	gb_transport_message_response_success_send(msg, &resp, sizeof(resp), cport);
 }
 
 /**
- * @brief Callback invoked when the greybus host connects to the cemra cport
+ * @brief Callback invoked when the greybus host connects to the camera cport
  * Initializes camera protocol state and binds the Zephyr video device.
  * @param priv- Private driver data pointer
  * @param cport- The CPort number that was connected.

@@ -112,7 +112,6 @@ static int cam_get_format(const struct device *dev, struct video_format *fmt)
 
 static int cam_flush(const struct device *dev, bool cancel)
 {
-
 	/* For the emulator, we just log it and return success- written for the ztest suite */
 	LOG_INF("Stream flushed (cancel: %d)", cancel);
 	return 0;
