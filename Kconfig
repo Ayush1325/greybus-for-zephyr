@@ -2,4 +2,5 @@
 
 source "subsys/greybus/Kconfig"
 rsource "drivers/video/Kconfig"
+rsource "drivers/audio/Kconfig"
 
