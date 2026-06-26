@@ -110,7 +110,7 @@ static int codec_stop(const struct device *dev, audio_dai_dir_t dir)
 	return 0;
 }
 
-static const struct audio_codec_api audio_api = {
+ static DEVICE_API(audio_codec, audio_api)= {
 	.configure = codec_configure,
 	.start_output = codec_start_output,
 	.stop_output = codec_stop_output,
@@ -129,4 +129,4 @@ static int audio_init(const struct device *dev)
 static struct audio_data audio_data_0;
 
 DEVICE_DT_INST_DEFINE(0, audio_init, NULL, &audio_data_0, NULL, POST_KERNEL,
-		      CONFIG_AUDIO_INIT_PRIORITY, &audio_api);
+		      CONFIG_AUDIO_CODEC_INIT_PRIORITY, &audio_api);

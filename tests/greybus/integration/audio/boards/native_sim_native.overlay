@@ -1,0 +1,11 @@
+/ {
+	aliases {
+		audio0 = &fake_audio;
+	};
+
+	fake_audio: fake_audio_0 {
+		compatible = "zephyr,fake-audio-codec";
+		status = "okay";
+	};
+    
+};
