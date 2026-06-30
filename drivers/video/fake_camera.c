@@ -110,6 +110,13 @@ static int cam_get_format(const struct device *dev, struct video_format *fmt)
 	return 0;
 }
 
+static int cam_flush(const struct device *dev, bool cancel)
+{
+	/* For the emulator, we just log it and return success- written for the ztest suite */
+	LOG_INF("Stream flushed (cancel: %d)", cancel);
+	return 0;
+}
+
 static DEVICE_API(video, cam_driver_api) = {
 	.set_format = cam_set_format,
 	.get_format = cam_get_format,
@@ -117,6 +124,7 @@ static DEVICE_API(video, cam_driver_api) = {
 	.set_stream = cam_set_stream,
 	.enqueue = cam_enqueue,
 	.dequeue = cam_dequeue,
+	.flush = cam_flush,
 };
 
 static int cam_init(const struct device *dev)
