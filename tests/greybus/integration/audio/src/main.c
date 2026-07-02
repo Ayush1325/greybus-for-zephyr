@@ -8,20 +8,9 @@
 #include <zephyr/device.h>
 #include <zephyr/audio/codec.h>
 #include <zephyr/logging/log.h>
+#include "fake_audio.h"
 
 LOG_MODULE_REGISTER(audio_test, LOG_LEVEL_INF);
-
-/* * Redefine the internal data structure here so our test suite 
- * can look inside the driver and verify the state changes.
- */
-struct audio_data {
-    struct audio_codec_cfg cfg;
-    int vol_out;
-    int vol_in;
-    bool mute_out;
-    bool mute_in;
-    bool is_started;
-};
 
 static const struct device *get_audio_dev(void)
 {
@@ -32,9 +21,9 @@ static const struct device *get_audio_dev(void)
 
 static void *audio_setup(void)
 {
-    const struct device *dev = get_audio_dev();
+    get_audio_dev();
     LOG_INF("Audio Codec found and ready for testing.");
-    return (void *)dev;
+    return NULL;
 }
 
 ZTEST_SUITE(audio_tests, NULL, audio_setup, NULL, NULL, NULL);

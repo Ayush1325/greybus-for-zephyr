@@ -10,6 +10,7 @@
 #include <zephyr/device.h>
 #include <zephyr/audio/codec.h>
 #include <zephyr/logging/log.h>
+#include "fake_audio.h"
 
 LOG_MODULE_REGISTER(fake_audio, LOG_LEVEL_INF);
 /*
@@ -18,14 +19,6 @@ LOG_MODULE_REGISTER(fake_audio, LOG_LEVEL_INF);
  * Zephyr's codec wrappers return -ENOSYS when optional callbacks
  * are not provided.
  */
-struct audio_data {
-	struct audio_codec_cfg cfg;
-	int vol_out;
-	int vol_in;
-	bool mute_out;
-	bool mute_in;
-	bool is_started;
-};
 /*
  * Store the requested codec configuration.
  * The fake driver does not program real hardware; it simply retains
