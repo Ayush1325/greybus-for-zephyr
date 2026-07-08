@@ -1,0 +1,5 @@
+config FAKE_AUDIO
+	bool "Fake Audio Driver"
+	default n
+	help
+	  Enable the fake audio driver for simulation testing
