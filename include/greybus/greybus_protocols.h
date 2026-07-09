@@ -1822,6 +1822,7 @@ struct gb_lights_get_flash_fault_response {
 
 /* Audio */
 
+#define GB_AUDIO_TYPE_PROTOCOL_VERSION 0x01
 #define GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE 0x02
 #define GB_AUDIO_TYPE_GET_TOPOLOGY      0x03
 #define GB_AUDIO_TYPE_GET_CONTROL       0x04

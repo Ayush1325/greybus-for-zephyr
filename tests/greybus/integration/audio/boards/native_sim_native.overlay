@@ -1,11 +1,21 @@
 / {
-	aliases {
-		audio0 = &fake_audio;
-	};
+    aliases {
+        audio0 = &fake_audio;
+    };
 
-	fake_audio: fake_audio_0 {
-		compatible = "zephyr,fake-audio-codec";
-		status = "okay";
-	};
+    fake_audio: fake_audio_0 {
+        compatible = "zephyr,fake-audio-codec";
+        status = "okay";
+    };
     
+    zephyr_greybus {
+        compatible = "zephyr,greybus";
+        status = "okay";
+        
+        bundle_audio: bundle_audio {
+            compatible = "zephyr,greybus-bundle-audio";
+            status = "okay";
+            audios = <&fake_audio>; 
+        };
+    };
 };

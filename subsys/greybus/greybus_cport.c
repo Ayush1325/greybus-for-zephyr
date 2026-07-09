@@ -17,6 +17,7 @@
 #include "greybus_fw_mgmt.h"
 #include "greybus_internal.h"
 #include "greybus_raw_internal.h"
+#include "greybus_audio.h"
 
 LOG_MODULE_REGISTER(greybus_cport, CONFIG_GREYBUS_LOG_LEVEL);
 
@@ -26,6 +27,7 @@ extern const struct gb_driver gb_loopback_driver;
 extern const struct gb_driver gb_log_driver;
 extern const struct gb_driver gb_vibrator_driver;
 extern const struct gb_driver gb_camera_driver;
+extern const struct gb_driver gb_audio_driver;
 
 /* Reset the counter to 0 */
 enum {
@@ -76,6 +78,26 @@ static struct gb_camera_driver_data gb_camera_priv_data_##_node_id_##_idx = {   
 	IF_ENABLED(CONFIG_GREYBUS_CAMERA,                                                          \
 		   (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, cameras, _GB_CPORT_CAMERA, (, ),      \
 						   _bundle)))
+
+#define GB_AUDIO_PRIV_DATA(_node_id, _prop, _idx)                                              \
+static struct gb_audio_driver_data gb_audio_priv_data_##_node_id_##_idx = {                    \
+        .dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
+    };
+
+#define GB_CPORT_AUDIO_PRIV_DATA(_node_id, _prop, _idx) &gb_audio_priv_data_##_node_id_##_idx
+
+#define _GB_CPORT_AUDIO(_node_id, _prop, _idx, _bundle)                                        \
+   GB_CPORT(GB_CPORT_AUDIO_PRIV_DATA(_node_id, _prop, _idx), _bundle, GREYBUS_PROTOCOL_AUDIO_MGMT, \
+         &gb_audio_driver)
+
+#define GB_AUDIO_PRIV_DATA_HANDLER(_node_id)                                                   \
+    IF_ENABLED(CONFIG_GREYBUS_AUDIO,                                                           \
+           (DT_FOREACH_PROP_ELEM(_node_id, audios, GB_AUDIO_PRIV_DATA)))
+
+#define GREYBUS_CPORT_IN_AUDIO(_node_id, _bundle)                                              \
+    IF_ENABLED(CONFIG_GREYBUS_AUDIO,                                                           \
+           (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, audios, _GB_CPORT_AUDIO, (, ),        \
+                           _bundle)))
 
 #define GB_BRIDGED_PHY_PRIV_DATA_HANDLER(_node_id)                                                 \
 	IF_ENABLED(GB_BRIDGED_PHY_CHECK(_node_id, gpio_controllers, CONFIG_GREYBUS_GPIO),          \
@@ -141,7 +163,10 @@ static struct gb_camera_driver_data gb_camera_priv_data_##_node_id_##_idx = {   
 			(COND_CODE_1(                                       \
 				DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_camera, okay), \
 				(GB_CAMERA_PRIV_DATA_HANDLER(_node_id)),    \
-				())))))
+				(COND_CODE_1(                                                      \
+                    DT_NODE_HAS_COMPAT_STATUS(_node_id, zephyr_greybus_bundle_audio, okay), \
+                    (GB_AUDIO_PRIV_DATA_HANDLER(_node_id)),                        \
+                    ())))))))
 
 /* Define GPIO private data */
 DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
@@ -199,21 +224,23 @@ DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_PRIV_DATA_HANDLER)
 						   GREYBUS_PROTOCOL_VIBRATOR, &gb_vibrator_driver, \
 						   GB_CPORT_DEV_PRIV_DATA)))
 
-#define GB_CPORTS_IN_BUNDLE(node_id, bundle)                                                       \
-	COND_CODE_1(                                                                               \
-		DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_bridged_phy, okay),       \
-		(GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id, bundle)),                           \
-		(COND_CODE_1(                                                                      \
-			DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_lights, okay),    \
-			(GREYBUS_CPORT_IN_LIGHTS(node_id, bundle)),                                \
-			(COND_CODE_1(                                                              \
-				DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_camera,   \
-							  okay),                                   \
-				(GREYBUS_CPORT_IN_CAMERA(node_id, bundle)),                        \
-				(IF_ENABLED(                                                       \
-					DT_NODE_HAS_COMPAT_STATUS(                                 \
-						node_id, zephyr_greybus_bundle_vibrator, okay),    \
-					(GREYBUS_CPORT_IN_VIBRATORS(node_id, bundle)))))))))
+#define GB_CPORTS_IN_BUNDLE(node_id, bundle)                                             \
+	COND_CODE_1(                                                                     \
+		DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_bridged_phy, okay), \
+		(GREYBUS_CPORTS_IN_BRIDGED_PHY_BUNDLE(node_id, bundle)),                 \
+		(COND_CODE_1(                                                            \
+			DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_lights, okay), \
+			(GREYBUS_CPORT_IN_LIGHTS(node_id, bundle)),                      \
+			(COND_CODE_1(                                                  \
+				DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_camera, okay), \
+				(GREYBUS_CPORT_IN_CAMERA(node_id, bundle)),            \
+				(COND_CODE_1(                                          \
+					DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_vibrator, okay), \
+					(GREYBUS_CPORT_IN_VIBRATORS(node_id, bundle)),   \
+					(COND_CODE_1(                                  \
+						DT_NODE_HAS_COMPAT_STATUS(node_id, zephyr_greybus_bundle_audio, okay), \
+						(GREYBUS_CPORT_IN_AUDIO(node_id, bundle)), \
+						())))))))))
 
 /* Requred for counter based naming to work */
 #define GB_CPORTS_BUNDLE_WRAPPER(node_id) GB_CPORTS_IN_BUNDLE(node_id, LOCAL_COUNTER)

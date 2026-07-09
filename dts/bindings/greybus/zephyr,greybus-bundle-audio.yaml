@@ -1,0 +1,13 @@
+# Copyright (c) 2026, Pavithra CP BeagleBoard.org
+# SPDX-License-Identifier: Apache-2.0
+
+description: Greybus Bundle for Audio class
+
+compatible: "zephyr,greybus-bundle-audio"
+
+include: [base.yaml]
+
+properties:
+  audios:
+    type: phandles
+    description: Audio devices in the bundle
