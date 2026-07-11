@@ -17,15 +17,15 @@
 #define STATE_STREAMING    4
 
 struct gb_audio_driver_data {
-    const struct device *dev;
-    struct {
-        uint8_t state;
-    } info;
+	const struct device *dev;
+	struct {
+		uint8_t state;
+	} info;
 };
 
 struct gb_audio_version_response {
-    uint8_t major;
-    uint8_t minor;
+	uint8_t major;
+	uint8_t minor;
 } __attribute__((packed));
 
 extern const struct gb_driver gb_audio_driver;
