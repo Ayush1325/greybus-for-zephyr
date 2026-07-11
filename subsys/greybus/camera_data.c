@@ -14,6 +14,7 @@
 #define GB_CAMERA_TYPE_DATA 0x00
 #endif
 
+K_MEM_SLAB_DEFINE_STATIC(camera_data_slab, GB_CAMERA_SLAB_BLOCK_SIZE, GB_CAMERA_SLAB_NUM_BLOCKS, 4);
 LOG_MODULE_DECLARE(greybus_camera_test, CONFIG_GREYBUS_LOG_LEVEL);
 
 static void gb_camera_frame_worker(struct k_work *work)
@@ -42,6 +43,17 @@ static void gb_camera_frame_worker(struct k_work *work)
 	uint32_t offset = 0;
 
 	ctx->frag_state.frame_id++;
+	if (ctx->frag_state.target_frames > 0 &&
+	    ctx->frag_state.frame_id > ctx->frag_state.target_frames) {
+
+		LOG_INF("Reached target of %u frames, stopping stream.",
+			ctx->frag_state.target_frames);
+		atomic_set(&ctx->stream_state, GB_DATA_STATE_IDLE);
+
+		video_enqueue(ctx->video_dev, vbuf);
+		k_mutex_unlock(&ctx->data_lock);
+		return;
+	}
 
 	while (offset < frame_size) {
 
@@ -50,21 +62,27 @@ static void gb_camera_frame_worker(struct k_work *work)
 			chunk_size = GB_CAMERA_DATA_MTU;
 		}
 
-		struct gb_message *msg =
-			gb_message_request_alloc(chunk_size, GB_CAMERA_TYPE_DATA, false);
+		struct gb_message *msg;
 
-		if (!msg) {
-			LOG_ERR("Failed to allocate memory for frame fragment!");
-			break; /* Break the loop, but DO NOT skip recycling */
+		if (k_mem_slab_alloc(&camera_data_slab, (void **)&msg, K_NO_WAIT) != 0) {
+			LOG_ERR("Failed to allocate memory from slab");
+			break;
 		}
+
+		msg->header.size =
+			sys_cpu_to_le16(sizeof(struct gb_operation_msg_hdr) + chunk_size);
+		msg->header.type = GB_CAMERA_TYPE_DATA;
+		msg->header.operation_id = 0; // 0 is for unidirectional events
 
 		memcpy(msg->payload, vbuf->buffer + offset, chunk_size);
 
 		ret = gb_transport_message_send(msg, ctx->data_cport);
+		k_mem_slab_free(&camera_data_slab, (void *)msg); // free the slab back to the pool
+		//(as gb_transport_messafe_send takes a const pointer- so it only reads/copies and
+		//doesnt free)
 		if (ret < 0) {
 			LOG_ERR("Failed to transmit fragment at offset %u", offset);
-			gb_message_dealloc(msg);
-			break; /* Break the loop, but DO NOT skip recycling */
+			break;
 		}
 
 		offset += chunk_size;
@@ -103,11 +121,13 @@ int gb_camera_data_init(struct gb_camera_data_ctx *ctx, const struct device *vid
 	return 0;
 }
 
-int gb_camera_data_start_stream(struct gb_camera_data_ctx *ctx)
+int gb_camera_data_start_stream(struct gb_camera_data_ctx *ctx, uint16_t num_frames)
 {
 	if (atomic_get(&ctx->stream_state) == GB_DATA_STATE_STREAMING) {
 		return -EALREADY;
 	}
+
+	ctx->frag_state.target_frames = num_frames;
 
 	for (int i = 0; i < GB_CAMERA_NUM_BUFFERS; i++) {
 

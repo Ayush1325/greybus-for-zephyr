@@ -279,7 +279,7 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 	struct gb_camera_driver_data *drv_data = (struct gb_camera_driver_data *)data;
 	struct gb_camera_capture_request *req;
 	size_t payload_size;
-	//	uint16_t num_frames;
+	uint16_t num_frames;
 	int ret;
 
 	if (drv_data == NULL || drv_data->info.state < STATE_CONFIGURED) {
@@ -294,8 +294,8 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 	}
 
 	req = (struct gb_camera_capture_request *)msg->payload;
-	//	num_frames = sys_le16_to_cpu(req->num_frames);
-	ret = gb_camera_data_start_stream(&drv_data->data_ctx);
+	num_frames = sys_le16_to_cpu(req->num_frames);
+	ret = gb_camera_data_start_stream(&drv_data->data_ctx, num_frames);
 	if (ret != 0 && ret != -EALREADY) {
 		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
 		return;
@@ -311,10 +311,6 @@ static void gb_camera_capture(uint16_t cport, struct gb_message *msg,
 		drv_data->info.state = STATE_STREAMING;
 	}
 
-	/* TODO for Data CPort Architecture PR:
-	 * an asynchronous worker thread here to pull `num_frames`
-	 * from `video_dequeue()` and push them over the Data CPort
-	 */
 	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
@@ -352,11 +348,7 @@ static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
 
 	memset(&resp, 0, sizeof(resp));
 
-	/* TODO for Data CPort Architecture:
-	 * this request_id must be updated to track the ID of the last successfully
-	 * flushed capture request once the asynchronous data queue (mentioned before) is
-	 * implemented. Hardcoded to 0 for the MVP */
-	resp.request_id = sys_cpu_to_le32(0);
+	resp.request_id = sys_cpu_to_le32(drv_data->data_ctx.frag_state.frame_id);
 
 	gb_transport_message_response_success_send(msg, &resp, sizeof(resp), cport);
 }
@@ -370,6 +362,7 @@ static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
 static void gb_camera_connected(const void *priv, uint16_t cport)
 {
 	struct gb_camera_driver_data *data = (struct gb_camera_driver_data *)priv;
+	int ret;
 
 	if (!data) {
 		LOG_ERR("No driver data provided in priv!");
@@ -384,7 +377,7 @@ static void gb_camera_connected(const void *priv, uint16_t cport)
 	}
 
 	data->info.state = STATE_UNCONFIGURED;
-	int ret = gb_camera_data_init(&data->data_ctx, data->dev, cport);
+	ret = gb_camera_data_init(&data->data_ctx, data->dev, cport);
 	if (ret != 0) {
 		LOG_ERR("Failed to initialize Camera Data Plane!");
 	}
