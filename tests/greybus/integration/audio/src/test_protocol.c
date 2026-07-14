@@ -52,3 +52,25 @@ ZTEST(audio_protocol_tests, test_audio_protocol_version)
 	zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
 		      "Protocol Version request should not alter driver state");
 }
+
+ZTEST(audio_protocol_tests, test_audio_set_pcm_valid)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	uint16_t test_cport = 4;
+
+	gb_audio_driver.connected(&drv_data, test_cport);
+
+	struct gb_message *msg = gb_message_request_alloc(sizeof(struct gb_audio_set_pcm_request),
+							  GB_AUDIO_TYPE_SET_PCM, false);
+	zassert_not_null(msg, "Failed to allocate SET_PCM message");
+
+	struct gb_audio_set_pcm_request *req = (struct gb_audio_set_pcm_request *)msg->payload;
+	req->rate = sys_cpu_to_le32(48000);
+	req->channels = 2;
+	req->sig_bits = 16;
+
+	gb_audio_driver.op_handler(&drv_data, msg, test_cport);
+
+	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
+		      "Driver should transition to STATE_CONFIGURED after valid PCM setup");
+}
