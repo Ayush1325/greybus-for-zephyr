@@ -336,7 +336,7 @@ static void gb_camera_flush(uint16_t cport, struct gb_message *msg,
 		return;
 	}
 
-	ret = video_flush(drv_data->dev, true);
+	ret = video_driver_flush(drv_data->dev, true);
 	if (ret) {
 		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
 		return;
