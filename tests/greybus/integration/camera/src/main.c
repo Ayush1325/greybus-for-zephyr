@@ -23,8 +23,9 @@ static const int camera_cport = 1;
 static void *camera_setup(void)
 {
 	struct gb_msg_with_cport resp;
-	struct gb_control_version_request *ver_req;
 	struct gb_message *msg;
+	struct gb_control_version_request *ver_req;
+	struct gb_control_connected_request *conn_req;
 
 	msg = gb_message_request_alloc(sizeof(*ver_req), GB_CONTROL_TYPE_VERSION, false);
 	ver_req = (struct gb_control_version_request *)msg->payload;
@@ -35,8 +36,18 @@ static void *camera_setup(void)
 	resp = gb_transport_get_message();
 	zassert_not_null(resp.msg, "No version response received");
 	zassert_true(gb_message_is_success(resp.msg), "Version Handshake failed");
-
 	gb_message_dealloc(resp.msg);
+
+	msg = gb_message_request_alloc(sizeof(*conn_req), GB_CONTROL_TYPE_CONNECTED, false);
+	conn_req = (struct gb_control_connected_request *)msg->payload;
+	conn_req->cport_id = sys_cpu_to_le16(camera_cport);
+
+	greybus_rx_handler(0, msg);
+	resp = gb_transport_get_message();
+	zassert_not_null(resp.msg, "No connect response received");
+	zassert_true(gb_message_is_success(resp.msg), "CPort Connection failed");
+	gb_message_dealloc(resp.msg);
+
 	return NULL;
 }
 
@@ -63,8 +74,6 @@ ZTEST(greybus_camera_tests, test_attempt_premature_capture)
 	gb_message_dealloc(resp.msg);
 }
 
-/*note that the tests are named as such to conincidentally follow the lexicographic order right now
- */
 ZTEST(greybus_camera_tests, test_bad_configure_zero_res)
 {
 	struct gb_message *req;
@@ -102,8 +111,11 @@ ZTEST(greybus_camera_tests, test_configure_valid)
 	cfg_req = (struct gb_camera_configure_streams_request *)req->payload;
 	cfg_req->num_streams = 1;
 
-	cfg_req->config[0].width = sys_cpu_to_le16(640);
-	cfg_req->config[0].height = sys_cpu_to_le16(480);
+	/* --- FIX: Lower resolution so the 4KB memory pool is accepted --- */
+	cfg_req->config[0].width = sys_cpu_to_le16(32);
+	cfg_req->config[0].height = sys_cpu_to_le16(32);
+	/* ---------------------------------------------------------------- */
+
 	cfg_req->config[0].format = sys_cpu_to_le16(1);
 
 	greybus_rx_handler(camera_cport, req);
@@ -157,7 +169,7 @@ ZTEST(greybus_camera_tests, test_garbage_capture_payload)
 	gb_message_dealloc(resp.msg);
 }
 
-ZTEST(greybus_camera_tests, test_valid_capture)
+ZTEST(greybus_camera_tests, test_valid_01_capture)
 {
 	struct gb_msg_with_cport resp;
 	struct gb_message *req;
@@ -177,24 +189,57 @@ ZTEST(greybus_camera_tests, test_valid_capture)
 	gb_message_dealloc(resp.msg);
 }
 
-ZTEST(greybus_camera_tests, test_valid_flush)
+ZTEST(greybus_camera_tests, test_valid_02_data_wait)
+{
+
+	struct gb_msg_with_cport resp;
+
+	for (int i = 0; i < 2; i++) {
+		resp = gb_transport_get_message();
+
+		zassert_not_null(resp.msg, "Received null message!");
+		zassert_equal(resp.msg->header.type, 0x00, "Expected Data packet (type 0), got: %d",
+			      resp.msg->header.type);
+
+		gb_message_dealloc(resp.msg);
+	}
+}
+
+ZTEST(greybus_camera_tests, test_valid_03_flush)
 {
 	struct gb_msg_with_cport resp;
 	struct gb_message *req;
 	const struct gb_camera_flush_response *flush_resp;
+	bool flush_response_received = false;
 
 	req = gb_message_request_alloc(0, GB_CAMERA_TYPE_FLUSH, false);
-
 	greybus_rx_handler(camera_cport, req);
-	resp = gb_transport_get_message();
 
-	zassert_not_null(resp.msg, "No flush response received");
-	zassert_true(gb_message_is_success(resp.msg), "Valid Flush failed: %d",
-		     resp.msg->header.result);
+	for (int i = 0; i < 50; i++) {
+		resp = gb_transport_get_message();
 
-	flush_resp = (struct gb_camera_flush_response *)resp.msg->payload;
-	zassert_equal(flush_resp->request_id, sys_cpu_to_le32(0),
-		      "Expected stubbed request_id of 0");
+		if (resp.msg == NULL) {
+			k_msleep(10);
+			continue;
+		}
 
-	gb_message_dealloc(resp.msg);
+		if (resp.msg->header.type == 0x00) {
+			gb_message_dealloc(resp.msg);
+			continue;
+		}
+
+		zassert_true(gb_message_is_success(resp.msg), "Valid Flush failed: %d",
+			     resp.msg->header.result);
+
+		flush_resp = (struct gb_camera_flush_response *)resp.msg->payload;
+		zassert_equal(flush_resp->request_id, sys_cpu_to_le32(1),
+			      "Expected stubbed request_id of 1");
+		// expected 1 after processing the previous frame
+
+		gb_message_dealloc(resp.msg);
+		flush_response_received = true;
+		break;
+	}
+
+	zassert_true(flush_response_received, "Queue drained but never received flush response!");
 }

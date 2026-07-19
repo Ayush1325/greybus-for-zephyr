@@ -59,7 +59,7 @@ zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_I2C transport/i2c.c)
 
 # Protocols
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_AUDIO audio.c)
-zephyr_library_sources_ifdef(CONFIG_GREYBUS_CAMERA camera.c)
+zephyr_library_sources_ifdef(CONFIG_GREYBUS_CAMERA camera.c camera_data.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_GPIO gpio.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_HID hid.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_I2C i2c.c)

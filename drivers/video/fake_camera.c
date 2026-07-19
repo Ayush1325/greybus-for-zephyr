@@ -45,9 +45,9 @@ static int cam_enqueue(const struct device *dev, struct video_buffer *vbuf)
 	struct cam_data *data = dev->data;
 
 	if (vbuf == NULL || vbuf->buffer == NULL || vbuf->size == 0) {
+		LOG_INF("enqueue failed validation");
 		return -EINVAL;
 	}
-
 	k_fifo_put(&data->in_queue, vbuf);
 	return 0;
 }
