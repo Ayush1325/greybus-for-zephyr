@@ -101,3 +101,33 @@ ZTEST(audio_protocol_tests, test_audio_set_control_volume)
 	zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
 		      "Driver state should remain stable after a control update");
 }
+
+ZTEST(audio_protocol_tests, test_audio_get_topology_size)
+{
+    struct gb_audio_driver_data drv_data = {0};
+
+    gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE, false);
+    zassert_not_null(msg, "Failed to allocate GET_TOPOLOGY_SIZE message");
+
+    gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+    zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
+              "Driver state should remain STATE_UNCONFIGURED after topology size query");
+}
+
+ZTEST(audio_protocol_tests, test_audio_get_topology)
+{
+    struct gb_audio_driver_data drv_data = {0};
+
+    gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_GET_TOPOLOGY, false);
+    zassert_not_null(msg, "Failed to allocate GET_TOPOLOGY message");
+
+    gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+    zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
+              "Driver state should remain STATE_UNCONFIGURED after topology query");
+}
