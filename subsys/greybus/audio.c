@@ -21,7 +21,7 @@
 #define GB_AUDIO_CONTROL_ID_VOLUME 1
 #define GB_AUDIO_CONTROL_ID_MUTE   2
 
-#define NUM_TOPOLOGY_CONTROLS  (sizeof(current_topology) / sizeof(current_topology[0]))
+#define NUM_TOPOLOGY_CONTROLS (sizeof(current_topology) / sizeof(current_topology[0]))
 
 #define NUM_DAIS     1
 #define NUM_CONTROLS 2
@@ -30,7 +30,7 @@
 
 #define GB_AUDIO_WIDGET_ID_SPEAKER 3
 #define GB_AUDIO_WIDGET_ID_MIC     4
-#define AUDIO_TOPOLOGY_MAX_SIZE 512
+#define AUDIO_TOPOLOGY_MAX_SIZE    512
 
 LOG_MODULE_REGISTER(greybus_audio, CONFIG_GREYBUS_LOG_LEVEL);
 
@@ -45,8 +45,8 @@ struct gb_audio_control_map {
 };
 
 static const struct gb_audio_control_map current_topology[] = {
-    {.gb_control_id = GB_AUDIO_CONTROL_ID_VOLUME, .zephyr_prop = AUDIO_PROPERTY_OUTPUT_VOLUME},
-    {.gb_control_id = GB_AUDIO_CONTROL_ID_MUTE,   .zephyr_prop = AUDIO_PROPERTY_INPUT_MUTE},
+	{.gb_control_id = GB_AUDIO_CONTROL_ID_VOLUME, .zephyr_prop = AUDIO_PROPERTY_OUTPUT_VOLUME},
+	{.gb_control_id = GB_AUDIO_CONTROL_ID_MUTE, .zephyr_prop = AUDIO_PROPERTY_INPUT_MUTE},
 };
 
 static void gb_audio_protocol_version(uint16_t cport, struct gb_message *msg)
@@ -181,84 +181,118 @@ static void gb_audio_set_control(uint16_t cport, struct gb_message *msg,
 	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
-
 static size_t gb_audio_get_topology_size_bytes(void)
 {
-    return sizeof(struct gb_audio_topology) + (NUM_DAIS * sizeof(struct gb_audio_dai)) + (NUM_CONTROLS * sizeof(struct gb_audio_control)) + (NUM_WIDGETS * sizeof(struct gb_audio_widget)) + (NUM_ROUTES * sizeof(struct gb_audio_route));
+	return sizeof(struct gb_audio_topology) + (NUM_DAIS * sizeof(struct gb_audio_dai)) +
+	       (NUM_CONTROLS * sizeof(struct gb_audio_control)) +
+	       (NUM_WIDGETS * sizeof(struct gb_audio_widget)) +
+	       (NUM_ROUTES * sizeof(struct gb_audio_route));
 }
 
 static void gb_audio_get_topology_size(uint16_t cport, struct gb_message *msg)
 {
-    struct gb_audio_get_topology_size_response resp_payload;
-    resp_payload.size = sys_cpu_to_le16((uint16_t)gb_audio_get_topology_size_bytes());
+	struct gb_audio_get_topology_size_response resp_payload;
+	resp_payload.size = sys_cpu_to_le16((uint16_t)gb_audio_get_topology_size_bytes());
 
-    gb_transport_message_response_success_send(msg, &resp_payload, sizeof(resp_payload), cport);
+	gb_transport_message_response_success_send(msg, &resp_payload, sizeof(resp_payload), cport);
 }
 
 static void gb_audio_get_topology(uint16_t cport, struct gb_message *msg)
 {
-    size_t topo_size = gb_audio_get_topology_size_bytes();
-    /*
-     * Use a static aligned buffer to avoid large stack allocations
-    */
-    static uint8_t buffer[AUDIO_TOPOLOGY_MAX_SIZE] __aligned(4);
+	size_t topo_size = gb_audio_get_topology_size_bytes();
+	/*
+	 * Use a static aligned buffer to avoid large stack allocations
+	 */
+	static uint8_t buffer[AUDIO_TOPOLOGY_MAX_SIZE] __aligned(4);
 
-    if (topo_size > sizeof(buffer)) {
-        LOG_ERR("Topology size %zu exceeds max buffer %zu", topo_size, sizeof(buffer));
-        gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+	if (topo_size > sizeof(buffer)) {
+		LOG_ERR("Topology size %zu exceeds max buffer %zu", topo_size, sizeof(buffer));
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
+
+	struct gb_audio_topology *topo = (struct gb_audio_topology *)buffer;
+	memset(topo, 0, topo_size);
+
+	topo->num_dais = NUM_DAIS;
+	topo->num_controls = NUM_CONTROLS;
+	topo->num_widgets = NUM_WIDGETS;
+	topo->num_routes = NUM_ROUTES;
+
+	topo->size_dais = sys_cpu_to_le32(NUM_DAIS * sizeof(struct gb_audio_dai));
+	topo->size_controls = sys_cpu_to_le32(NUM_CONTROLS * sizeof(struct gb_audio_control));
+	topo->size_widgets = sys_cpu_to_le32(NUM_WIDGETS * sizeof(struct gb_audio_widget));
+	topo->size_routes = sys_cpu_to_le32(NUM_ROUTES * sizeof(struct gb_audio_route));
+	topo->jack_type = sys_cpu_to_le32(GB_AUDIO_JACK_HEADSET);
+
+	uint8_t *data_ptr = topo->data;
+
+	struct gb_audio_dai *dais = (struct gb_audio_dai *)data_ptr;
+	snprintf(dais[0].name, AUDIO_DAI_NAME_MAX, "Zephyr-I2S");
+	dais[0].data_cport = sys_cpu_to_le16(cport);
+	data_ptr += (NUM_DAIS * sizeof(struct gb_audio_dai));
+
+	struct gb_audio_control *controls = (struct gb_audio_control *)data_ptr;
+
+	snprintf(controls[0].name, AUDIO_CONTROL_NAME_MAX, "Master Playback Volume");
+	controls[0].id = GB_AUDIO_CONTROL_ID_VOLUME;
+	controls[0].iface = GB_AUDIO_CTL_ELEM_IFACE_MIXER;
+	controls[0].access = sys_cpu_to_le32(GB_AUDIO_ACCESS_READ | GB_AUDIO_ACCESS_WRITE);
+
+	snprintf(controls[1].name, AUDIO_CONTROL_NAME_MAX, "Master Capture Switch");
+	controls[1].id = GB_AUDIO_CONTROL_ID_MUTE;
+	controls[1].iface = GB_AUDIO_CTL_ELEM_IFACE_MIXER;
+	controls[1].access = sys_cpu_to_le32(GB_AUDIO_ACCESS_READ | GB_AUDIO_ACCESS_WRITE);
+
+	data_ptr += (NUM_CONTROLS * sizeof(struct gb_audio_control));
+
+	struct gb_audio_widget *widgets = (struct gb_audio_widget *)data_ptr;
+
+	snprintf(widgets[0].name, AUDIO_WIDGET_NAME_MAX, "Speaker");
+	widgets[0].id = GB_AUDIO_WIDGET_ID_SPEAKER;
+	widgets[0].type = GB_AUDIO_WIDGET_TYPE_SPK;
+	widgets[0].state = GB_AUDIO_WIDGET_STATE_ENABLED;
+	widgets[0].ncontrols = 0;
+
+	snprintf(widgets[1].name, AUDIO_WIDGET_NAME_MAX, "Mic");
+	widgets[1].id = GB_AUDIO_WIDGET_ID_MIC;
+	widgets[1].type = GB_AUDIO_WIDGET_TYPE_MIC;
+	widgets[1].state = GB_AUDIO_WIDGET_STATE_ENABLED;
+	widgets[1].ncontrols = 0;
+
+	gb_transport_message_response_success_send(msg, topo, topo_size, cport);
+}
+
+static void gb_audio_activate_tx(uint16_t cport, struct gb_message *msg,
+                                 struct gb_audio_driver_data *data)
+{
+    if (data == NULL || data->info.state != STATE_CONFIGURED) {
+        LOG_ERR("Cannot activate TX stream: PCM not configured");
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
         return;
     }
 
-    struct gb_audio_topology *topo = (struct gb_audio_topology *)buffer;
-    memset(topo, 0, topo_size);
-
-    topo->num_dais = NUM_DAIS;
-    topo->num_controls = NUM_CONTROLS;
-    topo->num_widgets = NUM_WIDGETS;
-    topo->num_routes = NUM_ROUTES;
-
-    topo->size_dais = sys_cpu_to_le32(NUM_DAIS * sizeof(struct gb_audio_dai));
-    topo->size_controls = sys_cpu_to_le32(NUM_CONTROLS * sizeof(struct gb_audio_control));
-    topo->size_widgets = sys_cpu_to_le32(NUM_WIDGETS * sizeof(struct gb_audio_widget));
-    topo->size_routes = sys_cpu_to_le32(NUM_ROUTES * sizeof(struct gb_audio_route));
-    topo->jack_type = sys_cpu_to_le32(GB_AUDIO_JACK_HEADSET);
-
-    uint8_t *data_ptr = topo->data;
-
-    struct gb_audio_dai *dais = (struct gb_audio_dai *)data_ptr;
-    snprintf(dais[0].name, AUDIO_DAI_NAME_MAX, "Zephyr-I2S");
-    dais[0].data_cport = sys_cpu_to_le16(cport);
-    data_ptr += (NUM_DAIS * sizeof(struct gb_audio_dai));
-
-    struct gb_audio_control *controls = (struct gb_audio_control *)data_ptr;
+    audio_codec_start_output(data->dev);
     
-    snprintf(controls[0].name, AUDIO_CONTROL_NAME_MAX, "Master Playback Volume");
-    controls[0].id = GB_AUDIO_CONTROL_ID_VOLUME;
-    controls[0].iface = GB_AUDIO_CTL_ELEM_IFACE_MIXER;
-    controls[0].access = sys_cpu_to_le32(GB_AUDIO_ACCESS_READ | GB_AUDIO_ACCESS_WRITE);
-    
-    snprintf(controls[1].name, AUDIO_CONTROL_NAME_MAX, "Master Capture Switch");
-    controls[1].id = GB_AUDIO_CONTROL_ID_MUTE;
-    controls[1].iface = GB_AUDIO_CTL_ELEM_IFACE_MIXER;
-    controls[1].access = sys_cpu_to_le32(GB_AUDIO_ACCESS_READ | GB_AUDIO_ACCESS_WRITE);
-    
-    data_ptr += (NUM_CONTROLS * sizeof(struct gb_audio_control));
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
 
-    struct gb_audio_widget *widgets = (struct gb_audio_widget *)data_ptr;
+static void gb_audio_activate_rx(uint16_t cport, struct gb_message *msg,
+                                 struct gb_audio_driver_data *data)
+{
+    if (data == NULL || data->info.state != STATE_CONFIGURED) {
+        LOG_ERR("Cannot activate RX stream: PCM not configured");
+        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+        return;
+    }
+
+    /* 
+     * Note- Zephyr's codec API currently lacks audio_codec_start_input().
+     * We accept the Linux command and simulate the activation.
+     */
+    LOG_INF("RX stream activation requested by host");
     
-    snprintf(widgets[0].name, AUDIO_WIDGET_NAME_MAX, "Speaker");
-    widgets[0].id = GB_AUDIO_WIDGET_ID_SPEAKER;
-    widgets[0].type = GB_AUDIO_WIDGET_TYPE_SPK;
-    widgets[0].state = GB_AUDIO_WIDGET_STATE_ENABLED; 
-    widgets[0].ncontrols = 0;
-    
-    snprintf(widgets[1].name, AUDIO_WIDGET_NAME_MAX, "Mic");
-    widgets[1].id = GB_AUDIO_WIDGET_ID_MIC;
-    widgets[1].type = GB_AUDIO_WIDGET_TYPE_MIC;
-    widgets[1].state = GB_AUDIO_WIDGET_STATE_ENABLED; 
-    widgets[1].ncontrols = 0;
-    
-    gb_transport_message_response_success_send(msg, topo, topo_size, cport);
+    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t cport)
@@ -269,17 +303,24 @@ static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t 
 	case GB_AUDIO_TYPE_PROTOCOL_VERSION:
 		gb_audio_protocol_version(cport, msg);
 		break;
-  case GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE:
-    gb_audio_get_topology_size(cport, msg);
-    break;
-  case GB_AUDIO_TYPE_GET_TOPOLOGY:
-    gb_audio_get_topology(cport, msg);
-    break;
+	case GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE:
+		gb_audio_get_topology_size(cport, msg);
+		break;
+	case GB_AUDIO_TYPE_GET_TOPOLOGY:
+		gb_audio_get_topology(cport, msg);
+		break;
 	case GB_AUDIO_TYPE_SET_PCM:
 		gb_audio_set_pcm(cport, msg, data);
 		break;
 	case GB_AUDIO_TYPE_SET_CONTROL:
 		gb_audio_set_control(cport, msg, data);
+		break;
+	case GB_AUDIO_TYPE_ACTIVATE_TX:
+		gb_audio_activate_tx(cport, msg, (struct gb_audio_driver_data *)data);
+		break;
+	case GB_AUDIO_TYPE_ACTIVATE_RX:
+		// we have to cast away const for activation
+		gb_audio_activate_rx(cport, msg, (struct gb_audio_driver_data *)data);
 		break;
 	default:
 		LOG_ERR("Invalid type: %d", gb_message_type(msg));

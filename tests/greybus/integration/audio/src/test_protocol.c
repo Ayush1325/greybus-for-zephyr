@@ -104,30 +104,65 @@ ZTEST(audio_protocol_tests, test_audio_set_control_volume)
 
 ZTEST(audio_protocol_tests, test_audio_get_topology_size)
 {
-    struct gb_audio_driver_data drv_data = {0};
+	struct gb_audio_driver_data drv_data = {0};
 
-    gb_audio_driver.connected(&drv_data, TEST_CPORT);
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
 
-    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE, false);
-    zassert_not_null(msg, "Failed to allocate GET_TOPOLOGY_SIZE message");
+	struct gb_message *msg =
+		gb_message_request_alloc(0, GB_AUDIO_TYPE_GET_TOPOLOGY_SIZE, false);
+	zassert_not_null(msg, "Failed to allocate GET_TOPOLOGY_SIZE message");
 
-    gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
 
-    zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
-              "Driver state should remain STATE_UNCONFIGURED after topology size query");
+	zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
+		      "Driver state should remain STATE_UNCONFIGURED after topology size query");
 }
 
 ZTEST(audio_protocol_tests, test_audio_get_topology)
 {
+	struct gb_audio_driver_data drv_data = {0};
+
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_GET_TOPOLOGY, false);
+	zassert_not_null(msg, "Failed to allocate GET_TOPOLOGY message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
+		      "Driver state should remain STATE_UNCONFIGURED after topology query");
+}
+
+/*
+ * Here the state is STATE_UNCONFIGURED by default upon connection
+ * and it should remain unconfigured as it is an invalid command
+ */
+ZTEST(audio_protocol_tests, test_audio_activate_tx_unconfigured)
+{
     struct gb_audio_driver_data drv_data = {0};
-
     gb_audio_driver.connected(&drv_data, TEST_CPORT);
-
-    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_GET_TOPOLOGY, false);
-    zassert_not_null(msg, "Failed to allocate GET_TOPOLOGY message");
+    
+    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_ACTIVATE_TX, false);
+    zassert_not_null(msg, "Failed to allocate ACTIVATE_TX message");
 
     gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
 
-    zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
-              "Driver state should remain STATE_UNCONFIGURED after topology query");
+    zassert_equal(drv_data.info.state, STATE_UNCONFIGURED, 
+                  "State should not change on invalid TX activation");
+}
+
+ZTEST(audio_protocol_tests, test_audio_activate_tx_configured)
+{
+    struct gb_audio_driver_data drv_data = {0};
+    gb_audio_driver.connected(&drv_data, TEST_CPORT);
+    
+    drv_data.info.state = STATE_CONFIGURED;
+
+    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_ACTIVATE_TX, false);
+    zassert_not_null(msg, "Failed to allocate ACTIVATE_TX message");
+
+    gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+    zassert_equal(drv_data.info.state, STATE_CONFIGURED, 
+                  "State should remain STATE_CONFIGURED after valid TX activation");
 }
