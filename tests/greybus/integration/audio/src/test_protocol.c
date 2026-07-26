@@ -139,30 +139,62 @@ ZTEST(audio_protocol_tests, test_audio_get_topology)
  */
 ZTEST(audio_protocol_tests, test_audio_activate_tx_unconfigured)
 {
-    struct gb_audio_driver_data drv_data = {0};
-    gb_audio_driver.connected(&drv_data, TEST_CPORT);
-    
-    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_ACTIVATE_TX, false);
-    zassert_not_null(msg, "Failed to allocate ACTIVATE_TX message");
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
 
-    gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+	struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_ACTIVATE_TX, false);
+	zassert_not_null(msg, "Failed to allocate ACTIVATE_TX message");
 
-    zassert_equal(drv_data.info.state, STATE_UNCONFIGURED, 
-                  "State should not change on invalid TX activation");
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
+		      "State should not change on invalid TX activation");
 }
 
 ZTEST(audio_protocol_tests, test_audio_activate_tx_configured)
 {
-    struct gb_audio_driver_data drv_data = {0};
-    gb_audio_driver.connected(&drv_data, TEST_CPORT);
-    
-    drv_data.info.state = STATE_CONFIGURED;
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
 
-    struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_ACTIVATE_TX, false);
-    zassert_not_null(msg, "Failed to allocate ACTIVATE_TX message");
+	drv_data.info.state = STATE_CONFIGURED;
 
-    gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+	struct gb_message *msg = gb_message_request_alloc(0, GB_AUDIO_TYPE_ACTIVATE_TX, false);
+	zassert_not_null(msg, "Failed to allocate ACTIVATE_TX message");
 
-    zassert_equal(drv_data.info.state, STATE_CONFIGURED, 
-                  "State should remain STATE_CONFIGURED after valid TX activation");
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
+		      "State should remain STATE_CONFIGURED after valid TX activation");
+}
+
+ZTEST(audio_protocol_tests, test_audio_send_data_unconfigured)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_send_data_request) + 64, GB_AUDIO_TYPE_SEND_DATA, false);
+	zassert_not_null(msg, "Failed to allocate SEND_DATA message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_UNCONFIGURED,
+		      "State should remain STATE_UNCONFIGURED after rejecting SEND_DATA");
+}
+
+ZTEST(audio_protocol_tests, test_audio_send_data_configured)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	drv_data.info.state = STATE_CONFIGURED;
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_send_data_request) + 128, GB_AUDIO_TYPE_SEND_DATA, false);
+	zassert_not_null(msg, "Failed to allocate SEND_DATA message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
+		      "State should remain STATE_CONFIGURED after successful SEND_DATA");
 }

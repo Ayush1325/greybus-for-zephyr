@@ -264,35 +264,66 @@ static void gb_audio_get_topology(uint16_t cport, struct gb_message *msg)
 }
 
 static void gb_audio_activate_tx(uint16_t cport, struct gb_message *msg,
-                                 struct gb_audio_driver_data *data)
+				 struct gb_audio_driver_data *data)
 {
-    if (data == NULL || data->info.state != STATE_CONFIGURED) {
-        LOG_ERR("Cannot activate TX stream: PCM not configured");
-        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-        return;
-    }
+	if (data == NULL || data->info.state != STATE_CONFIGURED) {
+		LOG_ERR("Cannot activate TX stream: PCM not configured");
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
 
-    audio_codec_start_output(data->dev);
-    
-    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+	audio_codec_start_output(data->dev);
+
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 static void gb_audio_activate_rx(uint16_t cport, struct gb_message *msg,
-                                 struct gb_audio_driver_data *data)
+				 struct gb_audio_driver_data *data)
 {
-    if (data == NULL || data->info.state != STATE_CONFIGURED) {
-        LOG_ERR("Cannot activate RX stream: PCM not configured");
-        gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
-        return;
-    }
+	if (data == NULL || data->info.state != STATE_CONFIGURED) {
+		LOG_ERR("Cannot activate RX stream: PCM not configured");
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+	/*
+	 * Note- Zephyr's codec API currently lacks audio_codec_start_input().
+	 * We accept the Linux command and simulate the activation.
+	 */
+	LOG_INF("RX stream activation requested by host");
 
-    /* 
-     * Note- Zephyr's codec API currently lacks audio_codec_start_input().
-     * We accept the Linux command and simulate the activation.
-     */
-    LOG_INF("RX stream activation requested by host");
-    
-    gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
+static void gb_audio_send_data(uint16_t cport, struct gb_message *msg,
+			       struct gb_audio_driver_data *data)
+{
+	struct gb_audio_send_data_request *req;
+	size_t data_len;
+	int ret;
+
+	if (data == NULL || data->info.state != STATE_CONFIGURED) {
+		LOG_ERR("Cannot accept audio data: PCM not configured");
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+
+	if (gb_message_payload_len(msg) < sizeof(struct gb_audio_send_data_request)) {
+		LOG_ERR("SEND_DATA payload too small");
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+
+	req = (struct gb_audio_send_data_request *)msg->payload;
+	data_len = gb_message_payload_len(msg) - sizeof(struct gb_audio_send_data_request);
+
+	ret = audio_codec_write(data->dev, req->data, data_len);
+	if (ret) {
+		LOG_ERR("Failed to write %zu bytes to codec: %d", data_len, ret);
+		gb_transport_message_empty_response_send(msg, GB_OP_UNKNOWN_ERROR, cport);
+		return;
+	}
+
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
 static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t cport)
@@ -321,6 +352,9 @@ static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t 
 	case GB_AUDIO_TYPE_ACTIVATE_RX:
 		// we have to cast away const for activation
 		gb_audio_activate_rx(cport, msg, (struct gb_audio_driver_data *)data);
+		break;
+	case GB_AUDIO_TYPE_SEND_DATA:
+		gb_audio_send_data(cport, msg, (struct gb_audio_driver_data *)data);
 		break;
 	default:
 		LOG_ERR("Invalid type: %d", gb_message_type(msg));
