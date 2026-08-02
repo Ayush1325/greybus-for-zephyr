@@ -251,3 +251,28 @@ ZTEST(audio_protocol_tests, test_audio_button_event)
 	// since native_sim lacks a physical transport backend
 	zassert_equal(ret, -42, "Expected transport error -42 due to missing backend");
 }
+
+ZTEST(audio_protocol_tests, test_audio_enable_widget)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_enable_widget_request), GB_AUDIO_TYPE_ENABLE_WIDGET, false);
+	zassert_not_null(msg, "Failed to allocate ENABLE_WIDGET message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+}
+
+ZTEST(audio_protocol_tests, test_audio_disable_widget)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	struct gb_message *msg =
+		gb_message_request_alloc(sizeof(struct gb_audio_disable_widget_request),
+					 GB_AUDIO_TYPE_DISABLE_WIDGET, false);
+	zassert_not_null(msg, "Failed to allocate DISABLE_WIDGET message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+}

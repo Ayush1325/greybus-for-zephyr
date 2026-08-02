@@ -403,6 +403,22 @@ int gb_audio_send_button_event(uint16_t cport, uint8_t widget_id, uint8_t button
 	return gb_transport_message_send(msg, cport);
 }
 
+// These are sort of stubs for hardware migration. In a real hardware, this turns on and off the
+// amplifier power rail
+static void gb_audio_enable_widget(uint16_t cport, struct gb_message *msg,
+				   struct gb_audio_driver_data *data)
+{
+	LOG_INF("Widget enabled by host");
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
+static void gb_audio_disable_widget(uint16_t cport, struct gb_message *msg,
+				    struct gb_audio_driver_data *data)
+{
+	LOG_INF("Widget disabled by host");
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
 static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
 	const struct gb_audio_driver_data *data = priv;
@@ -438,6 +454,12 @@ static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t 
 		break;
 	case GB_AUDIO_TYPE_DEACTIVATE_RX:
 		gb_audio_deactivate_rx(cport, msg, (struct gb_audio_driver_data *)data);
+		break;
+	case GB_AUDIO_TYPE_ENABLE_WIDGET:
+		gb_audio_enable_widget(cport, msg, (struct gb_audio_driver_data *)data);
+		break;
+	case GB_AUDIO_TYPE_DISABLE_WIDGET:
+		gb_audio_disable_widget(cport, msg, (struct gb_audio_driver_data *)data);
 		break;
 	default:
 		LOG_ERR("Invalid type: %d", gb_message_type(msg));
