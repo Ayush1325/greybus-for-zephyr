@@ -349,13 +349,58 @@ static void gb_audio_deactivate_rx(uint16_t cport, struct gb_message *msg,
 		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
 		return;
 	}
-
 	/*
 	 * Zephyr's codec API currently lacks audio_codec_stop_input()
 	 */
 	LOG_INF("RX stream deactivated");
 
 	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
+/*
+ * Proactively notify the linux host that a physical jack was inserted or removed
+ * Note- the return types here are int as we are sending the event to zephyr host
+ */
+int gb_audio_send_jack_event(uint16_t cport, uint8_t widget_id, uint8_t jack_attribute,
+			     uint8_t event)
+{
+	struct gb_message *msg;
+	struct gb_audio_jack_event_request *req;
+
+	msg = gb_message_request_alloc(sizeof(struct gb_audio_jack_event_request),
+				       GB_AUDIO_TYPE_JACK_EVENT, false);
+	if (!msg) {
+		LOG_ERR("Failed to allocate JACK_EVENT message");
+		return -ENOMEM;
+	}
+
+	req = (struct gb_audio_jack_event_request *)msg->payload;
+	req->widget_id = widget_id;
+	req->jack_attribute = jack_attribute;
+	req->event = event;
+
+	/* Send the event to the Linux host */
+	return gb_transport_message_send(msg, cport);
+}
+
+int gb_audio_send_button_event(uint16_t cport, uint8_t widget_id, uint8_t button_id, uint8_t event)
+{
+	struct gb_message *msg;
+	struct gb_audio_button_event_request *req;
+
+	msg = gb_message_request_alloc(sizeof(struct gb_audio_button_event_request),
+				       GB_AUDIO_TYPE_BUTTON_EVENT, false);
+	if (!msg) {
+		LOG_ERR("Failed to allocate BUTTON_EVENT message");
+		return -ENOMEM;
+	}
+
+	req = (struct gb_audio_button_event_request *)msg->payload;
+	req->widget_id = widget_id;
+	req->button_id = button_id;
+	req->event = event;
+
+	return gb_transport_message_send(msg, cport);
 }
 
 static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t cport)
