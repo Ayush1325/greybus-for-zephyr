@@ -326,6 +326,38 @@ static void gb_audio_send_data(uint16_t cport, struct gb_message *msg,
 	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
 }
 
+static void gb_audio_deactivate_tx(uint16_t cport, struct gb_message *msg,
+				   struct gb_audio_driver_data *data)
+{
+	if (data == NULL || data->info.state != STATE_CONFIGURED) {
+		LOG_ERR("Cannot deactivate TX stream: PCM not configured");
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+
+	audio_codec_stop_output(data->dev);
+
+	LOG_INF("TX stream deactivated");
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
+static void gb_audio_deactivate_rx(uint16_t cport, struct gb_message *msg,
+				   struct gb_audio_driver_data *data)
+{
+	if (data == NULL || data->info.state != STATE_CONFIGURED) {
+		LOG_ERR("Cannot deactivate RX stream: PCM not configured");
+		gb_transport_message_empty_response_send(msg, GB_OP_INVALID, cport);
+		return;
+	}
+
+	/*
+	 * Zephyr's codec API currently lacks audio_codec_stop_input()
+	 */
+	LOG_INF("RX stream deactivated");
+
+	gb_transport_message_empty_response_send(msg, GB_OP_SUCCESS, cport);
+}
+
 static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t cport)
 {
 	const struct gb_audio_driver_data *data = priv;
@@ -355,6 +387,12 @@ static void gb_audio_handler(const void *priv, struct gb_message *msg, uint16_t 
 		break;
 	case GB_AUDIO_TYPE_SEND_DATA:
 		gb_audio_send_data(cport, msg, (struct gb_audio_driver_data *)data);
+		break;
+	case GB_AUDIO_TYPE_DEACTIVATE_TX:
+		gb_audio_deactivate_tx(cport, msg, (struct gb_audio_driver_data *)data);
+		break;
+	case GB_AUDIO_TYPE_DEACTIVATE_RX:
+		gb_audio_deactivate_rx(cport, msg, (struct gb_audio_driver_data *)data);
 		break;
 	default:
 		LOG_ERR("Invalid type: %d", gb_message_type(msg));

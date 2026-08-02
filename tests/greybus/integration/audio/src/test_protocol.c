@@ -198,3 +198,37 @@ ZTEST(audio_protocol_tests, test_audio_send_data_configured)
 	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
 		      "State should remain STATE_CONFIGURED after successful SEND_DATA");
 }
+
+ZTEST(audio_protocol_tests, test_audio_deactivate_tx)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	drv_data.info.state = STATE_CONFIGURED;
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_deactivate_tx_request), GB_AUDIO_TYPE_DEACTIVATE_TX, false);
+	zassert_not_null(msg, "Failed to allocate DEACTIVATE_TX message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
+		      "State should remain STATE_CONFIGURED after DEACTIVATE_TX");
+}
+
+ZTEST(audio_protocol_tests, test_audio_deactivate_rx)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	drv_data.info.state = STATE_CONFIGURED;
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_deactivate_rx_request), GB_AUDIO_TYPE_DEACTIVATE_RX, false);
+	zassert_not_null(msg, "Failed to allocate DEACTIVATE_RX message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
+		      "State should remain STATE_CONFIGURED after DEACTIVATE_RX");
+}
