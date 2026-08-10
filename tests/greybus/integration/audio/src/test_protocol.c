@@ -198,3 +198,81 @@ ZTEST(audio_protocol_tests, test_audio_send_data_configured)
 	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
 		      "State should remain STATE_CONFIGURED after successful SEND_DATA");
 }
+
+ZTEST(audio_protocol_tests, test_audio_deactivate_tx)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	drv_data.info.state = STATE_CONFIGURED;
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_deactivate_tx_request), GB_AUDIO_TYPE_DEACTIVATE_TX, false);
+	zassert_not_null(msg, "Failed to allocate DEACTIVATE_TX message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
+		      "State should remain STATE_CONFIGURED after DEACTIVATE_TX");
+}
+
+ZTEST(audio_protocol_tests, test_audio_deactivate_rx)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	drv_data.info.state = STATE_CONFIGURED;
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_deactivate_rx_request), GB_AUDIO_TYPE_DEACTIVATE_RX, false);
+	zassert_not_null(msg, "Failed to allocate DEACTIVATE_RX message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+
+	zassert_equal(drv_data.info.state, STATE_CONFIGURED,
+		      "State should remain STATE_CONFIGURED after DEACTIVATE_RX");
+}
+
+ZTEST(audio_protocol_tests, test_audio_jack_event)
+{
+	int ret;
+	/* simulating a headphone insertion into widget ID 4 */
+	ret = gb_audio_send_jack_event(TEST_CPORT, 4, GB_AUDIO_JACK_HEADPHONE,
+				       GB_AUDIO_JACK_EVENT_INSERTION);
+
+	zassert_equal(ret, -42, "Expected transport error -42 due to missing backend");
+}
+
+ZTEST(audio_protocol_tests, test_audio_button_event)
+{
+	int ret;
+	/*Simulating pressing the ID 1 (play/pause) */
+	ret = gb_audio_send_button_event(TEST_CPORT, 4, 1, GB_AUDIO_BUTTON_EVENT_PRESS);
+	// since native_sim lacks a physical transport backend
+	zassert_equal(ret, -42, "Expected transport error -42 due to missing backend");
+}
+
+ZTEST(audio_protocol_tests, test_audio_enable_widget)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	struct gb_message *msg = gb_message_request_alloc(
+		sizeof(struct gb_audio_enable_widget_request), GB_AUDIO_TYPE_ENABLE_WIDGET, false);
+	zassert_not_null(msg, "Failed to allocate ENABLE_WIDGET message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+}
+
+ZTEST(audio_protocol_tests, test_audio_disable_widget)
+{
+	struct gb_audio_driver_data drv_data = {0};
+	gb_audio_driver.connected(&drv_data, TEST_CPORT);
+
+	struct gb_message *msg =
+		gb_message_request_alloc(sizeof(struct gb_audio_disable_widget_request),
+					 GB_AUDIO_TYPE_DISABLE_WIDGET, false);
+	zassert_not_null(msg, "Failed to allocate DISABLE_WIDGET message");
+
+	gb_audio_driver.op_handler(&drv_data, msg, TEST_CPORT);
+}

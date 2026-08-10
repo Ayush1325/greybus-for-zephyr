@@ -30,4 +30,10 @@ struct gb_audio_version_response {
 
 extern const struct gb_driver gb_audio_driver;
 
+/* Helpers for asynchronous events */
+int gb_audio_send_jack_event(uint16_t cport, uint8_t widget_id, uint8_t jack_attribute,
+			     uint8_t event);
+
+int gb_audio_send_button_event(uint16_t cport, uint8_t widget_id, uint8_t button_id, uint8_t event);
+
 #endif /*__GREYBUS_AUDIO_H__*/
