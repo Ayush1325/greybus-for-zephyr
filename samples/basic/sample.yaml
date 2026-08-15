@@ -23,3 +23,9 @@ tests:
     sysbuild: true
     platform_allow: beagleconnect_freedom@C7/cc1352p7
     extra_args: EXTRA_CONF_FILE="transport-i2c.conf"
+
+  sample.greybus.basic.transport.uart:
+    build_only: true
+    sysbuild: true
+    platform_allow: beagleconnect_freedom@C7/cc1352p7
+    extra_args: EXTRA_CONF_FILE="transport-uart.conf"

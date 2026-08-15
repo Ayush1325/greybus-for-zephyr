@@ -56,6 +56,7 @@ zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_TCPIP transport/tcpip.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_DUMMY transport/dummy.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_APBRIDGE transport/apbridge.c)
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_I2C transport/i2c.c)
+zephyr_library_sources_ifdef(CONFIG_GREYBUS_XPORT_UART transport/uart.c transport/hdlc/hdlc.c)
 
 # Protocols
 zephyr_library_sources_ifdef(CONFIG_GREYBUS_AUDIO audio.c)
