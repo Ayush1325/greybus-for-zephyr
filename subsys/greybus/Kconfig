@@ -74,6 +74,14 @@ config GREYBUS_XPORT_I2C
 	help
 	  This creates a I2C target device for Greybus multiplex over single address.
 
+config GREYBUS_XPORT_UART
+        bool "Use UART Transport for Greybus"
+        depends on SERIAL
+        depends on UART_INTERRUPT_DRIVEN
+        depends on CRC
+        help
+          This uses HDLC over UART for communications.
+
 endchoice
 
 if GREYBUS_XPORT_I2C

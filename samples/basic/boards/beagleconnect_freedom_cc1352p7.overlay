@@ -7,6 +7,7 @@
 / {
 	aliases {
         	greybus-transport = &i2c0;
+        	greybus-transport-uart = &uart1;
 	};
 
 	zephyr,greybus {
