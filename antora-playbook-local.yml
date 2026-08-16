@@ -1,0 +1,24 @@
+# Mainly for testing standalone version of the site.
+# Going to just a component in mult-repo docsite in the future.
+
+site:
+  title: Greybus Zephyr
+  start_page: greybus-zephyr::index.adoc
+
+content:
+  sources:
+  - url: .
+    start_paths: docs
+
+ui:
+  bundle:
+    url: https://github.com/beagleboard/antora-ui-beagle/releases/download/continuous-release/ui-bundle.zip
+    snapshot: true
+
+antora:
+  extensions:
+  - '@antora/lunr-extension'
+
+asciidoc:
+  attributes:
+    page-pagination: ''
