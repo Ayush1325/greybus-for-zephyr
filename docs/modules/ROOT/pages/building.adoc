@@ -17,24 +17,12 @@ manifest:
       url: https://github.com/beagleboard/greybus-zephyr
 ----
 
-== Building for BeagleConnect Freedom
+== Building an Application
 
-Current testing has been performed using a mainline Linux kernel (6.12) on https://www.beagleboard.org/boards/beagleplay[BeaglePlay] with a CC1352P7 running https://github.com/Ayush1325/cc1352-firmware[greybus-host firmware] and https://www.beagleboard.org/boards/beagleconnect-freedom[BeagleConnect Freedom].
+Greybus is enabled with `CONFIG_GREYBUS=y`, and starts automatically during
+`SYS_INIT` unless `CONFIG_GREYBUS_SERVICE` is disabled. Beyond that, an
+application needs to select a transport and describe the peripherals it exposes
+in devicetree. `samples/basic` is a complete, minimal example of both.
 
-[source,bash]
-----
-west build -b beagleconnect_freedom --sysbuild \
-  -p modules/lib/greybus/samples/basic -- \
-  -DEXTRA_CONF_FILE="transport-tcpip.conf;802154-subg.conf"
-----
-
-The sample uses https://docs.mcuboot.com/[MCUboot] to provide OTA support. The following commands can be used to merge MCUboot and application firmware and flash it to BeagleConnect Freedom:
-
-[source,bash]
-----
-cp build/mcuboot/zephyr/zephyr.bin zephyr.bin
-dd conv=notrunc bs=1024 seek=56 \
-   if=build/basic/zephyr/zephyr.signed.bin of=zephyr.bin
-cc1352_flasher --bcf zephyr.bin
-rm zephyr.bin
-----
+For a board-specific walkthrough covering transport selection, MCUboot, and
+programming a device, see xref:beagleconnect-freedom.adoc[].
