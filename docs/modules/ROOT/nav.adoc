@@ -1,4 +1,5 @@
 * xref:building.adoc[]
+** xref:beagleconnect-freedom.adoc[]
 
 * Using Greybus Peripherals
 ** xref:gpio.adoc[]

@@ -1,0 +1,126 @@
+= Building and Flashing BeagleConnect Freedom
+
+https://www.beagleboard.org/boards/beagleconnect-freedom[BeagleConnect Freedom]
+is the reference Greybus node for this module. This page covers building the
+`samples/basic` application for it and writing the result to the board.
+
+Current testing has been performed using a mainline Linux kernel (6.12) on
+https://www.beagleboard.org/boards/beagleplay[BeaglePlay] with a CC1352P7
+running https://github.com/Ayush1325/cc1352-firmware[greybus-host firmware].
+
+== Prerequisites
+
+* A West workspace containing Zephyr and this module. See
+  xref:building.adoc[] for adding Greybus as a Zephyr module.
+
+* The `arm-zephyr-eabi` toolchain, installed through the
+  https://docs.zephyrproject.org/latest/develop/toolchains/zephyr_sdk.html[Zephyr SDK].
+
+* `cc1352_flasher`, the tool that talks to the on-board programmer. Refer to
+  the
+  https://docs.beagleboard.org/latest/boards/beagleconnect/freedom.html[BeagleConnect Freedom documentation]
+  for installation.
+
+All commands below are run from the West workspace top directory, with the
+module checked out at `modules/lib/greybus`.
+
+== Choosing a Transport
+
+Greybus is transport agnostic, and the sample selects a transport through
+`EXTRA_CONF_FILE`. Exactly one transport can be built in at a time.
+
+[cols="1,2,3", options="header"]
+|===
+| Transport | Config files | Notes
+
+| TCP/IP
+| `transport-tcpip.conf;802154-subg.conf`
+| Greybus over a sub-GHz IEEE 802.15.4 link. This is the combination CI builds
+  and the one used with BeaglePlay.
+
+| UART
+| `transport-uart.conf`
+| HDLC framing over the UART pointed at by the `greybus-transport-uart`
+  devicetree alias.
+
+| I2C
+| `transport-i2c.conf`
+| BeagleConnect Freedom acts as an I2C target on the bus pointed at by the
+  `greybus-transport` alias, at the address in
+  `CONFIG_GREYBUS_XPORT_I2C_ADDRESS`.
+
+| Dummy
+| `transport-dummy.conf`
+| Sends nothing. Useful for inspecting the generated manifest, which the sample
+  prints at start-up when this transport is selected.
+|===
+
+Both aliases are supplied by the board overlay in
+`samples/basic/boards/beagleconnect_freedom_cc1352p7.overlay`, which is also
+where the `zephyr,greybus` bundles listing the exposed peripherals are defined.
+
+== Building
+
+[source,bash]
+----
+west build -b beagleconnect_freedom --sysbuild \
+  -p modules/lib/greybus/samples/basic -- \
+  -DEXTRA_CONF_FILE="transport-tcpip.conf;802154-subg.conf"
+----
+
+`--sysbuild` is required: `samples/basic/sysbuild.conf` sets
+`SB_CONFIG_BOOTLOADER_MCUBOOT=y`, so the build produces both
+https://docs.mcuboot.com/[MCUboot] and a signed application image. MCUboot is
+what makes firmware updates over the Greybus firmware management protocol
+possible.
+
+The build leaves two artifacts of interest:
+
+`build/mcuboot/zephyr/zephyr.bin`:: The bootloader.
+`build/basic/zephyr/zephyr.signed.bin`:: The signed application.
+
+To build for a specific revision, use the fully qualified board target
+`beagleconnect_freedom@C7/cc1352p7`.
+
+== Creating a Flashable Image
+
+The two images are flashed as one blob. Start from the bootloader and overwrite
+the application slot, which begins 56 KiB into flash:
+
+[source,bash]
+----
+cp build/mcuboot/zephyr/zephyr.bin zephyr.bin
+dd conv=notrunc bs=1024 seek=56 if=build/basic/zephyr/zephyr.signed.bin of=zephyr.bin
+----
+
+`conv=notrunc` matters — without it `dd` would discard the bootloader that was
+just copied in.
+
+== Flashing
+
+[source,bash]
+----
+cc1352_flasher --bcf zephyr.bin
+rm zephyr.bin
+----
+
+The `--bcf` flag selects the BeagleConnect Freedom programmer.
+
+== Using Prebuilt Firmware
+
+Every push to `main` publishes a ready-to-flash image built with the TCP/IP
+transport over sub-GHz 802.15.4. Download the `greybus-beagleconnect-freedom`
+artifact from the *Greybus Module CI* workflow run on
+https://github.com/beagleboard/greybus-zephyr/actions[GitHub Actions], then:
+
+[source,bash]
+----
+unxz beagleconnect_freedom_subg.bin.xz
+cc1352_flasher --bcf beagleconnect_freedom_subg.bin
+----
+
+== Next Steps
+
+With the node flashed and the host running, the peripherals declared in the
+board overlay show up on the host as ordinary Linux devices. See
+xref:gpio.adoc[] and xref:i2c.adoc[] for driving them.
