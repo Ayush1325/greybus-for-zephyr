@@ -63,28 +63,32 @@ enum {
 		.device_num = 0,                                                                   \
 	};
 
-#define GB_CAMERA_PRIV_DATA(_node_id, _prop, _idx)                                                 \
-static struct gb_camera_driver_data gb_camera_priv_data_##_node_id_##_idx = {                         \
-		.dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
-	};
+#define GB_CAMERA_PRIV_DATA(_node_id, _prop, _idx)                                             \
+static struct gb_camera_driver_data gb_camera_priv_data_##_idx = {                             \
+        .dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                        \
+    };
 
-#define GB_CPORT_CAMERA_PRIV_DATA(_node_id, _prop, _idx) &gb_camera_priv_data_##_node_id_##_idx
+#define GB_CPORT_CAMERA_PRIV_DATA(_node_id, _prop, _idx) &gb_camera_priv_data_##_idx
 
-#define _GB_CPORT_CAMERA(_node_id, _prop, _idx, _bundle)                                           \
+#define _GB_CPORT_CAMERA(_node_id, _prop, _idx, _bundle)                                       \
    GB_CPORT(GB_CPORT_CAMERA_PRIV_DATA(_node_id, _prop, _idx), _bundle, GREYBUS_PROTOCOL_CAMERA_MGMT, \
          &gb_camera_driver)
 
-#define GREYBUS_CPORT_IN_CAMERA(_node_id, _bundle)                                                 \
-	IF_ENABLED(CONFIG_GREYBUS_CAMERA,                                                          \
-		   (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, cameras, _GB_CPORT_CAMERA, (, ),      \
-						   _bundle)))
+#define GREYBUS_CPORT_IN_CAMERA(_node_id, _bundle)                                             \
+    IF_ENABLED(CONFIG_GREYBUS_CAMERA,                                                          \
+           (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, cameras, _GB_CPORT_CAMERA, (, ),          \
+                           _bundle)))
+
+#define GB_CAMERA_PRIV_DATA_HANDLER(_node_id)                                                  \
+    IF_ENABLED(CONFIG_GREYBUS_CAMERA,                                                          \
+           (DT_FOREACH_PROP_ELEM(_node_id, cameras, GB_CAMERA_PRIV_DATA)))
 
 #define GB_AUDIO_PRIV_DATA(_node_id, _prop, _idx)                                              \
-static struct gb_audio_driver_data gb_audio_priv_data_##_node_id_##_idx = {                    \
-        .dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                    \
+static struct gb_audio_driver_data gb_audio_priv_data_##_idx = {                               \
+        .dev = DEVICE_DT_GET(DT_PHANDLE_BY_IDX(_node_id, _prop, _idx)),                        \
     };
 
-#define GB_CPORT_AUDIO_PRIV_DATA(_node_id, _prop, _idx) &gb_audio_priv_data_##_node_id_##_idx
+#define GB_CPORT_AUDIO_PRIV_DATA(_node_id, _prop, _idx) &gb_audio_priv_data_##_idx
 
 #define _GB_CPORT_AUDIO(_node_id, _prop, _idx, _bundle)                                        \
    GB_CPORT(GB_CPORT_AUDIO_PRIV_DATA(_node_id, _prop, _idx), _bundle, GREYBUS_PROTOCOL_AUDIO_MGMT, \
@@ -96,7 +100,7 @@ static struct gb_audio_driver_data gb_audio_priv_data_##_node_id_##_idx = {     
 
 #define GREYBUS_CPORT_IN_AUDIO(_node_id, _bundle)                                              \
     IF_ENABLED(CONFIG_GREYBUS_AUDIO,                                                           \
-           (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, audios, _GB_CPORT_AUDIO, (, ),        \
+           (DT_FOREACH_PROP_ELEM_SEP_VARGS(_node_id, audios, _GB_CPORT_AUDIO, (, ),            \
                            _bundle)))
 
 #define GB_BRIDGED_PHY_PRIV_DATA_HANDLER(_node_id)                                                 \
@@ -148,10 +152,6 @@ static struct gb_audio_driver_data gb_audio_priv_data_##_node_id_##_idx = {     
 
 #define GB_LIGHTS_PRIV_DATA_HANDLER(_node_id)                                                      \
 	IF_ENABLED(CONFIG_GREYBUS_LIGHTS, (GB_LIGHTS_PRIV_DATA(_node_id)))
-
-#define GB_CAMERA_PRIV_DATA_HANDLER(_node_id)                                                      \
-	IF_ENABLED(CONFIG_GREYBUS_CAMERA,                                                          \
-		   (DT_FOREACH_PROP_ELEM(_node_id, cameras, GB_CAMERA_PRIV_DATA)))
 
 #define GB_PRIV_DATA_HANDLER(_node_id)                                     \
 	COND_CODE_1(                                                       \
@@ -259,6 +259,9 @@ static struct gb_raw_driver_data gb_raw_driver_data_array[GREYBUS_RAW_CPORT_COUN
 
 #define GB_CPORTS_RAW(_bundle) LISTIFY(GREYBUS_RAW_CPORT_COUNT, GB_CPORT_RAW_HANDLER, (, ), _bundle)
 
+#define GB_IDENTITY(V) V
+#define GB_FLATTEN_CPORTS(...) FOR_EACH_NONEMPTY_TERM(GB_IDENTITY, (,), __VA_ARGS__)
+
 static struct gb_cport cports[] = {
 	/* cport0 is always control cport */
 	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_CONTROL, &gb_control_driver),
@@ -274,7 +277,9 @@ static struct gb_cport cports[] = {
 #ifdef CONFIG_GREYBUS_LOOPBACK
 	GB_CPORT(NULL, LOCAL_COUNTER, GREYBUS_PROTOCOL_LOOPBACK, &gb_loopback_driver),
 #endif // CONFIG_GREYBUS_LOOPBACK
-	DT_FOREACH_CHILD_STATUS_OKAY(_GREYBUS_BASE_NODE, GB_CPORTS_BUNDLE_WRAPPER)};
+GB_FLATTEN_CPORTS(
+        DT_FOREACH_CHILD_STATUS_OKAY_SEP(_GREYBUS_BASE_NODE, GB_CPORTS_BUNDLE_WRAPPER, (,))
+    )};
 
 BUILD_ASSERT(GREYBUS_CPORT_COUNT == ARRAY_SIZE(cports),
 	     "Greybus cport count and cports array are out of sync");
