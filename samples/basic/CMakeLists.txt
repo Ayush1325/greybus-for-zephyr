@@ -7,3 +7,5 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(greybus-basic)
 
 target_sources(app PRIVATE src/main.c)
+
+target_sources_ifdef(CONFIG_FAKE_CAMERA app PRIVATE ../../drivers/video/fake_camera.c)

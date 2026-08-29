@@ -7,6 +7,7 @@
 #include <string.h>
 
 LOG_MODULE_REGISTER(fake_cam, LOG_LEVEL_INF);
+static uint8_t frame_counter;
 
 struct cam_data {
 	struct video_format fmt;
@@ -32,8 +33,15 @@ static void frame_timer_handler(struct k_timer *timer)
 		return;
 	}
 
-	memset(vbuf->buffer, 0xAA, vbuf->size);
+	// memset(vbuf->buffer, 0xAA, vbuf->size);
+	// vbuf->bytesused = vbuf->size;
+	for (size_t i = 0; i < vbuf->size; i++) {
+		vbuf->buffer[i] = frame_counter + i;
+	}
+
+	frame_counter++;
 	vbuf->bytesused = vbuf->size;
+
 	vbuf->timestamp = k_uptime_get_32();
 
 	k_fifo_put(&data->out_queue, vbuf);
@@ -141,5 +149,14 @@ static int cam_init(const struct device *dev)
 
 static struct cam_data cam_data_0;
 
-DEVICE_DT_INST_DEFINE(0, cam_init, NULL, &cam_data_0, NULL, POST_KERNEL, CONFIG_VIDEO_INIT_PRIORITY,
-		      &cam_driver_api);
+// DEVICE_DT_INST_DEFINE(0, cam_init, NULL, &cam_data_0, NULL, POST_KERNEL,
+// CONFIG_VIDEO_INIT_PRIORITY,
+//		      &cam_driver_api);
+//
+
+#define FAKE_CAMERA_INIT(inst)                                                                     \
+	static struct cam_data cam_data_##inst;                                                    \
+	DEVICE_DT_INST_DEFINE(inst, cam_init, NULL, &cam_data_##inst, NULL, POST_KERNEL,           \
+			      CONFIG_VIDEO_INIT_PRIORITY, &cam_driver_api);
+
+DT_INST_FOREACH_STATUS_OKAY(FAKE_CAMERA_INIT)

@@ -15,7 +15,7 @@
 #endif
 
 K_MEM_SLAB_DEFINE_STATIC(camera_data_slab, GB_CAMERA_SLAB_BLOCK_SIZE, GB_CAMERA_SLAB_NUM_BLOCKS, 4);
-LOG_MODULE_DECLARE(greybus_camera_test, CONFIG_GREYBUS_LOG_LEVEL);
+LOG_MODULE_DECLARE(greybus_camera, CONFIG_GREYBUS_LOG_LEVEL);
 
 static void gb_camera_frame_worker(struct k_work *work)
 {
